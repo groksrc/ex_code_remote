@@ -12,9 +12,17 @@ defmodule ExCodeRemote.MCP.Tools do
   alias ExCodeRemote.Agent
   alias ExCodeRemote.MCP.ResultFormatter
 
-  # Match the Python server: same 60s default for every tool. The MCP client
-  # can override per-call for run_shell_command via the `timeout` argument.
-  @default_timeout 60
+  # Default timeout for non-shell tools. Shell calls accept a per-call
+  # `timeout` argument and clamp it (see @max_shell_timeout below).
+  @default_timeout 50
+
+  # Hard ceiling for any synchronous tool call. Fly's HTTP proxy has a
+  # ~60s per-request cap that isn't governed by http_options.idle_timeout
+  # and can't currently be raised via fly.toml. Capping at 50s keeps the
+  # dispatcher (which adds 5s slack) replying inside Fly's window so our
+  # timeout/error messages actually reach the MCP client. Commands that
+  # genuinely need longer belong on the async-tools path (planned).
+  @max_shell_timeout 50
 
   @machine_description "Target machine name (e.g. 'my-laptop', 'office-mac')"
 
@@ -35,8 +43,10 @@ defmodule ExCodeRemote.MCP.Tools do
           },
           "timeout" => %{
             "type" => "integer",
-            "description" => "Command timeout in seconds (default 60)",
-            "default" => 60
+            "description" =>
+              "Command timeout in seconds (default 50, max 50). The server caps synchronous tool calls at 50s; longer commands will be supported via async tools.",
+            "default" => 50,
+            "maximum" => 50
           }
         },
         "required" => ["machine", "command"]
@@ -217,6 +227,10 @@ defmodule ExCodeRemote.MCP.Tools do
 
   defp clamp_timeout(nil), do: @default_timeout
   defp clamp_timeout(val) when is_integer(val) and val < 1, do: 1
+
+  defp clamp_timeout(val) when is_integer(val) and val > @max_shell_timeout,
+    do: @max_shell_timeout
+
   defp clamp_timeout(val) when is_integer(val), do: val
   defp clamp_timeout(_), do: @default_timeout
 end

@@ -167,6 +167,31 @@ defmodule ExCodeRemote.MCP.PlugTest do
 
       assert content["text"] =~ "timeout was 1"
     end
+
+    test "timeout above the server max is clamped down", %{port: port} do
+      handler = fn %{"id" => id, "timeout" => timeout} ->
+        %{
+          type: "result",
+          id: id,
+          status: "completed",
+          output: "timeout was #{timeout}",
+          exit_code: 0
+        }
+      end
+
+      start_agent(port, "max-clamp-test", handler)
+
+      content =
+        call_tool(port, "run_shell_command", %{
+          "machine" => "max-clamp-test",
+          "command" => "echo",
+          "timeout" => 600
+        })
+
+      # Cap is 50s — Fly's HTTP proxy enforces a ~60s per-request limit
+      # we can't override via fly.toml, so anything above 50s gets clamped.
+      assert content["text"] =~ "timeout was 50"
+    end
   end
 
   describe "read_file" do

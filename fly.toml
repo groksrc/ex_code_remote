@@ -12,12 +12,13 @@ kill_timeout = "30s"
   auto_start_machines = true
   min_machines_running = 1
 
-# Bump Fly proxy idle_timeout from the 60s default to 600s so synchronous
-# tool calls (run_shell_command etc.) can wait for slow agents/builds
-# without the proxy closing the connection mid-flight. Anything genuinely
-# longer than this should be handled via async tools.
-[http_service.http_options]
-  idle_timeout = 600
+# NOTE: Fly's HTTP proxy enforces a ~60s per-request cap that is not
+# governed by http_options.idle_timeout (we tried setting it to 600 and
+# requests were still killed at exactly 60s with 502). idle_timeout
+# appears to control connection-level keepalive only, not single-request
+# duration. Until Fly exposes a per-request timeout knob (or we move to
+# streaming/SSE), the synchronous shell timeout is capped at 50s
+# server-side in ExCodeRemote.MCP.Tools — see @max_shell_timeout there.
 
 [[http_service.checks]]
   interval = "15s"
