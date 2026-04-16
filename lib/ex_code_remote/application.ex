@@ -11,7 +11,7 @@ defmodule ExCodeRemote.Application do
     children = [
       {Registry, keys: :unique, name: ExCodeRemote.AgentRegistry},
       {DynamicSupervisor, strategy: :one_for_one, name: ExCodeRemote.AgentSupervisor},
-      {Bandit, plug: ExCodeRemote.Router, port: port}
+      {Bandit, plug: ExCodeRemote.Router, port: port, scheme: :http}
     ]
 
     opts = [strategy: :one_for_one, name: ExCodeRemote.Supervisor]

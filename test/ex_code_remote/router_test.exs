@@ -16,6 +16,7 @@ defmodule ExCodeRemote.RouterTest do
     assert is_binary(body["version"])
     assert is_binary(body["timestamp"])
     assert String.ends_with?(body["timestamp"], "Z")
+    assert {:ok, _, _} = DateTime.from_iso8601(body["timestamp"])
   end
 
   test "GET /health version matches mix.exs" do
