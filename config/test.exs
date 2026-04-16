@@ -1,7 +1,8 @@
 import Config
 
 config :ex_code_remote,
-  auth_token: "test-token-for-testing"
+  auth_token: "test-token-for-testing",
+  require_private_network: false
 
 config :ex_code_remote, ExCodeRemote.Audit.Repo,
   database: "priv/data/test.db",

@@ -28,13 +28,13 @@ COPY priv priv
 RUN mix compile
 RUN mix release
 
+# Tailscale binaries — pinned to 1.82.5
+FROM tailscale/tailscale:v1.82.5 AS tailscale
+
 # Runtime stage
 FROM alpine:${ALPINE_VERSION} AS runtime
 
 RUN apk add --no-cache libstdc++ libgcc openssl ncurses-libs sqlite-libs
-
-# Create non-root user
-RUN addgroup -S appgroup && adduser -S appuser -G appgroup
 
 WORKDIR /app
 
@@ -42,8 +42,15 @@ ENV MIX_ENV=prod
 ENV PORT=8080
 ENV DATABASE_PATH=/data/audit.db
 
-# Create data directory for volume mount point, owned by appuser
-RUN mkdir -p /data && chown appuser:appgroup /data
+# Create data directory for volume mount point
+RUN mkdir -p /data
+
+# Create Tailscale state directory
+RUN mkdir -p /var/lib/tailscale
+
+# Copy Tailscale binaries
+COPY --from=tailscale /usr/local/bin/tailscale /usr/local/bin/tailscale
+COPY --from=tailscale /usr/local/bin/tailscaled /usr/local/bin/tailscaled
 
 # Copy release from build stage
 COPY --from=build /app/_build/prod/rel/ex_code_remote ./
@@ -52,11 +59,10 @@ COPY --from=build /app/_build/prod/rel/ex_code_remote ./
 COPY rel/entrypoint.sh /app/entrypoint.sh
 RUN chmod +x /app/entrypoint.sh
 
-# Own the app directory
-RUN chown -R appuser:appgroup /app
-
-USER appuser
-
 EXPOSE 8080
 
+# Entrypoint runs as root so tailscaled can bind sockets, then the
+# Elixir release drops to nobody via the exec. In practice on Fly,
+# the single-process-per-machine model makes this acceptable.
+# tailscaled requires root for userspace networking socket operations.
 ENTRYPOINT ["/app/entrypoint.sh"]

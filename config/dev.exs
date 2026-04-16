@@ -1,5 +1,8 @@
 import Config
 
+config :ex_code_remote,
+  require_private_network: false
+
 config :ex_code_remote, ExCodeRemote.Audit.Repo,
   database: "priv/data/audit.db",
   pool_size: 1,

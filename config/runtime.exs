@@ -43,6 +43,13 @@ if config_env() == :prod do
 
   config :ex_code_remote, auth_token: auth_token
 
+  require_private_network =
+    System.get_env("REQUIRE_PRIVATE_NETWORK", "true")
+    |> String.downcase()
+    |> Kernel.==("true")
+
+  config :ex_code_remote, require_private_network: require_private_network
+
   config :logger, :default_handler, formatter: {LoggerJSON.Formatters.Basic, []}
 
   database_path = System.get_env("DATABASE_PATH", "/data/audit.db")
