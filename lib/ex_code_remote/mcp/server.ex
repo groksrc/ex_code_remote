@@ -19,6 +19,14 @@ defmodule ExCodeRemote.MCP.Server do
   alias ExCodeRemote.Agent
   alias ExCodeRemote.MCP.ResultFormatter
 
+  # ExMCP's HttpPlug MessageProcessor sends {:handle_initialize, params}
+  # but the Handler GenServer macro defines handle_call for {:initialize, params}.
+  # Bridge the mismatch so HttpPlug can drive this handler.
+  @impl GenServer
+  def handle_call({:handle_initialize, params}, from, state) do
+    handle_call({:initialize, params}, from, state)
+  end
+
   @default_timeout 60
 
   # --- Initialize ---
