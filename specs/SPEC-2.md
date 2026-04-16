@@ -11,6 +11,8 @@ tags:
 
 # SPEC-2: HTTP Skeleton
 
+Status: Implemented
+
 ## Why
 
 Every later spec hangs off an HTTP server: the MCP tools surface as a mounted Plug, the agent WebSocket is a route upgrade, and the audit/debug endpoints are plain routes. Before any of that, we need a **walking skeleton** — a deployable, compiling Elixir application whose top-level supervisor starts Bandit, serves a single `/health` endpoint, and does nothing else.

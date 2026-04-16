@@ -21,3 +21,9 @@ port =
   end
 
 config :ex_code_remote, port: port
+
+# Only override auth_token from env if it's actually set.
+# In test, it comes from config/test.exs; in prod, from the environment.
+if auth_token = System.get_env("AUTH_TOKEN") do
+  config :ex_code_remote, auth_token: auth_token
+end

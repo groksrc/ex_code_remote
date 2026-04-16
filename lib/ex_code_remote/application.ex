@@ -6,6 +6,7 @@ defmodule ExCodeRemote.Application do
 
   @impl true
   def start(_type, _args) do
+    validate_auth_token!()
     port = Application.get_env(:ex_code_remote, :port, 4000)
 
     children = [
@@ -26,5 +27,22 @@ defmodule ExCodeRemote.Application do
     end
 
     result
+  end
+
+  defp validate_auth_token! do
+    case Application.get_env(:ex_code_remote, :auth_token) do
+      nil ->
+        raise "AUTH_TOKEN environment variable is required but not set"
+
+      token when is_binary(token) ->
+        if String.trim(token) == "" do
+          raise "AUTH_TOKEN environment variable is empty or whitespace-only"
+        end
+
+        :ok
+
+      _ ->
+        raise "AUTH_TOKEN environment variable has an invalid value"
+    end
   end
 end

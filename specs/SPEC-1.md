@@ -10,6 +10,8 @@ tags:
 
 # SPEC-1: Project Definition and Initialization
 
+Status: Implemented
+
 ## Why
 
 The existing `code-remote` Python implementation (`~/code/code-remote`) has chronic stability problems: multi-minute disconnects, event-loop stalls, subprocesses stuck in uninterruptible kernel wait, and result-correlation bugs from a polling-based SQLite queue. The most recent commits in that repo are all symptom-fighting patches (event-loop watchdog, process-group kills, background reapers, dual keep-alive loops) that treat the pattern rather than the architecture.

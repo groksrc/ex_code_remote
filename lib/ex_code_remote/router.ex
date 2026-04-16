@@ -19,6 +19,29 @@ defmodule ExCodeRemote.Router do
     |> send_resp(200, body)
   end
 
+  get "/ws/agent" do
+    token = conn.query_params["token"]
+    machine = conn.query_params["machine"]
+    expected_token = Application.get_env(:ex_code_remote, :auth_token)
+
+    cond do
+      is_nil(expected_token) or is_nil(token) or token == "" or
+          not Plug.Crypto.secure_compare(token, expected_token) ->
+        conn
+        |> put_resp_content_type("application/json")
+        |> send_resp(403, Jason.encode!(%{error: "forbidden"}))
+
+      is_nil(machine) or machine == "" ->
+        conn
+        |> put_resp_content_type("application/json")
+        |> send_resp(400, Jason.encode!(%{error: "missing_machine"}))
+
+      true ->
+        conn
+        |> WebSockAdapter.upgrade(ExCodeRemote.Agent.Socket, machine, [])
+    end
+  end
+
   match _ do
     body = Jason.encode!(%{error: "not found"})
 
