@@ -8,8 +8,9 @@ defmodule ExCodeRemote.Router do
   plug(:maybe_parse_body)
   plug(:dispatch)
 
-  # Skip Plug.Parsers for /mcp routes — ExMCP reads the body itself.
-  # Plug.Parsers consumes the request body, leaving nothing for ExMCP to read.
+  # Skip Plug.Parsers for /mcp routes — the MCP plug reads and decodes the
+  # body itself. Plug.Parsers consumes the request body, leaving nothing
+  # for the downstream plug to read.
   defp maybe_parse_body(%{path_info: ["mcp" | _]} = conn, _opts), do: conn
 
   defp maybe_parse_body(conn, _opts) do
@@ -62,17 +63,11 @@ defmodule ExCodeRemote.Router do
     handle_commands(conn)
   end
 
-  # MCP transport — ExMCP's HttpPlug handles /sse, POST (messages), and related paths.
-  # Mounted at /mcp so it doesn't shadow /health, /ws/agent, or the catch-all 404.
-  # MCP endpoint URL for Claude.ai connectors: https://<host>/mcp/sse
-  forward("/mcp",
-    to: ExMCP.HttpPlug,
-    init_opts: [
-      handler: ExCodeRemote.MCP.Server,
-      server_info: %{name: "code-remote", version: "0.1.0"},
-      sse_enabled: true
-    ]
-  )
+  # MCP transport — our own JSON-RPC over HTTP plug. Replaces ExMCP.HttpPlug
+  # so we control the request timeout (ExMCP hardcoded 10s, capping every
+  # tool call). The plug accepts POST at any path under /mcp, so existing
+  # Claude.ai connectors configured for /mcp/sse keep working.
+  forward("/mcp", to: ExCodeRemote.MCP.Plug)
 
   match _ do
     body = Jason.encode!(%{error: "not found"})

@@ -17,10 +17,15 @@ defmodule ExCodeRemote.MixProject do
   # Run "mix help compile.app" to learn about applications.
   def application do
     [
-      extra_applications: [:logger],
+      extra_applications: [:logger] ++ extra_applications(Mix.env()),
       mod: {ExCodeRemote.Application, []}
     ]
   end
+
+  # :inets ships :httpc, which the integration tests use as an HTTP client.
+  # No need to ship it in prod — Bandit/Cowboy handle the server side.
+  defp extra_applications(:test), do: [:inets]
+  defp extra_applications(_), do: []
 
   defp elixirc_paths(:test), do: ["lib", "test/support"]
   defp elixirc_paths(_), do: ["lib"]
@@ -45,14 +50,15 @@ defmodule ExCodeRemote.MixProject do
     [
       {:plug_cowboy, "~> 2.8"},
       {:plug, "~> 1.17"},
-      {:ex_mcp, "== 0.9.1"},
       {:jason, "~> 1.4"},
       {:websock_adapter, "~> 0.5"},
       {:telemetry, "~> 1.2"},
       {:ecto_sql, "~> 3.12"},
       {:ecto_sqlite3, "~> 0.17"},
       {:telemetry_metrics, "~> 1.0"},
-      {:logger_json, "~> 6.0"}
+      {:logger_json, "~> 6.0"},
+      # Test-only WebSocket client used by FakeAgent / WSClient helpers.
+      {:mint_web_socket, "~> 1.0", only: :test}
     ]
   end
 end
