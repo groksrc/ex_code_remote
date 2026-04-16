@@ -113,26 +113,31 @@ defmodule ExCodeRemote.MCP.Tools do
     with {:ok, machine} <- require_string(args, "machine"),
          {:ok, command} <- require_string(args, "command") do
       timeout = clamp_timeout(args["timeout"])
+      working_dir = args["working_dir"]
+
+      ctx = %{
+        command: command,
+        machine: machine,
+        timeout: timeout,
+        working_dir: working_dir
+      }
 
       machine
       |> Agent.dispatch(
-        %{
-          type: :shell,
-          command: command,
-          working_dir: args["working_dir"],
-          timeout: timeout
-        },
+        %{type: :shell, command: command, working_dir: working_dir, timeout: timeout},
         timeout
       )
-      |> shape_text()
+      |> shape_text(ctx)
     end
   end
 
   def call("read_file", args) do
     with {:ok, machine} <- require_string(args, "machine"),
          {:ok, path} <- require_string(args, "path") do
+      ctx = %{machine: machine, path: path, timeout: @default_timeout}
+
       Agent.dispatch(machine, %{type: :read_file, path: path}, @default_timeout)
-      |> shape_text()
+      |> shape_text(ctx)
     end
   end
 
@@ -140,20 +145,24 @@ defmodule ExCodeRemote.MCP.Tools do
     with {:ok, machine} <- require_string(args, "machine"),
          {:ok, path} <- require_string(args, "path"),
          {:ok, content} <- require_string(args, "content", allow_empty: true) do
+      ctx = %{machine: machine, path: path, timeout: @default_timeout}
+
       Agent.dispatch(
         machine,
         %{type: :write_file, path: path, content: content},
         @default_timeout
       )
-      |> shape_text()
+      |> shape_text(ctx)
     end
   end
 
   def call("list_directory", args) do
     with {:ok, machine} <- require_string(args, "machine"),
          {:ok, path} <- require_string(args, "path") do
+      ctx = %{machine: machine, path: path, timeout: @default_timeout}
+
       Agent.dispatch(machine, %{type: :list_dir, path: path}, @default_timeout)
-      |> shape_text()
+      |> shape_text(ctx)
     end
   end
 
@@ -175,8 +184,8 @@ defmodule ExCodeRemote.MCP.Tools do
 
   # --- Helpers ---
 
-  defp shape_text(dispatch_result) do
-    case ResultFormatter.format(dispatch_result) do
+  defp shape_text(dispatch_result, ctx) do
+    case ResultFormatter.format(dispatch_result, ctx) do
       {:ok, text} -> {:ok, [%{"type" => "text", "text" => text}]}
       {:error, text} -> {:tool_error, [%{"type" => "text", "text" => text}]}
     end

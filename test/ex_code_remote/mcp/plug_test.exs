@@ -125,8 +125,11 @@ defmodule ExCodeRemote.MCP.PlugTest do
 
       assert result["isError"] == true
 
-      assert hd(result["content"])["text"] =~ "not connected" or
-               hd(result["content"])["text"] =~ "No agents"
+      text = hd(result["content"])["text"]
+      assert text =~ "No agent"
+      assert text =~ "connected"
+      # The new formatter mentions the machine that wasn't found.
+      assert text =~ "no-such"
     end
 
     test "missing machine returns validation error", %{port: port} do
