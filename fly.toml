@@ -12,6 +12,13 @@ kill_timeout = "30s"
   auto_start_machines = true
   min_machines_running = 1
 
+# Bump Fly proxy idle_timeout from the 60s default to 600s so synchronous
+# tool calls (run_shell_command etc.) can wait for slow agents/builds
+# without the proxy closing the connection mid-flight. Anything genuinely
+# longer than this should be handled via async tools.
+[http_service.http_options]
+  idle_timeout = 600
+
 [[http_service.checks]]
   interval = "15s"
   timeout = "5s"
