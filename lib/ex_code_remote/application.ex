@@ -14,6 +14,8 @@ defmodule ExCodeRemote.Application do
       {DynamicSupervisor, strategy: :one_for_one, name: ExCodeRemote.AgentSupervisor},
       ExCodeRemote.Audit.Repo,
       {Task.Supervisor, name: ExCodeRemote.Audit.TaskSupervisor, max_children: 100},
+      {Registry, keys: :duplicate, name: ExCodeRemote.Commands.Subscribers},
+      {ExCodeRemote.Commands.StartupSweeper, []},
       {Plug.Cowboy, plug: ExCodeRemote.Router, scheme: :http, options: [port: port]}
     ]
 
