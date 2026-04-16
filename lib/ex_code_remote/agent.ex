@@ -80,4 +80,38 @@ defmodule ExCodeRemote.Agent do
     command = Map.put_new(command, :timeout, timeout_s)
     ExCodeRemote.Commands.Dispatcher.run(machine, command)
   end
+
+  @doc """
+  Dispatches a command to the agent without waiting for the reply.
+  Returns `{:ok, command_id, started_at}` once the audit row is
+  inserted and the execute frame has been queued to the connection
+  process. The eventual agent reply is recorded in the audit DB by
+  the connection process; subscribers wake up via
+  `ExCodeRemote.Commands.Subscribers`.
+
+  Returns `{:error, :not_connected}` if no agent for `machine` is
+  registered (no audit row is created — per SPEC-10 Decision 1).
+  Returns `{:error, reason}` for other dispatch failures (DB insert
+  failure, agent disconnect between lookup and dispatch).
+  """
+  @spec dispatch_async(String.t(), map()) ::
+          {:ok, command_id :: String.t(), started_at :: DateTime.t()}
+          | {:error, :not_connected | :agent_disconnected | term()}
+  def dispatch_async(machine, command) do
+    case Registry.lookup(@registry, machine) do
+      [{_pid, _}] ->
+        ExCodeRemote.Commands.Dispatcher.run_async(machine, command)
+
+      [] ->
+        Logger.info(fn ->
+          Jason.encode!(%{
+            event: "async_dispatch_rejected",
+            reason: "not_connected",
+            machine: machine
+          })
+        end)
+
+        {:error, :not_connected}
+    end
+  end
 end
