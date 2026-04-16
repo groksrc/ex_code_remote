@@ -306,13 +306,8 @@ defmodule ExCodeRemote.Plugs.PrivateNetworkTest do
   end
 
   describe "router integration" do
-    setup do
-      {:ok, server} =
-        Bandit.start_link(plug: ExCodeRemote.Router, port: 0, scheme: :http)
-
-      {:ok, {_addr, port}} = ThousandIsland.listener_info(server)
-      on_exit(fn -> Process.exit(server, :kill) end)
-      {:ok, port: port}
+    setup ctx do
+      ExCodeRemote.Test.Helpers.setup_server(ctx)
     end
 
     test "/health is not gated", %{port: port} do

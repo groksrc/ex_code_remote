@@ -5,20 +5,11 @@ defmodule ExCodeRemote.MCP.ServerTest do
 
   @token "test-token-for-testing"
 
-  setup do
-    {:ok, server} =
-      Bandit.start_link(plug: ExCodeRemote.Router, port: 0, scheme: :http)
+  setup :setup_server
 
-    {:ok, {_addr, port}} = ThousandIsland.listener_info(server)
+  defp setup_server(ctx), do: ExCodeRemote.Test.Helpers.setup_server(ctx)
 
-    on_exit(fn ->
-      Process.exit(server, :kill)
-    end)
-
-    {:ok, port: port}
-  end
-
-  import ExCodeRemote.Test.Helpers
+  import ExCodeRemote.Test.Helpers, only: [await_connected: 1, await_connected: 2, await_disconnected: 1, await_disconnected: 2]
 
   defp start_agent(port, machine, handler \\ nil) do
     opts = [port: port, machine: machine, owner: self()]

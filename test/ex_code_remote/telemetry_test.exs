@@ -4,7 +4,7 @@ defmodule ExCodeRemote.TelemetryTest do
   import ExUnit.CaptureLog
 
   alias ExCodeRemote.Test.FakeAgent
-  import ExCodeRemote.Test.Helpers
+  import ExCodeRemote.Test.Helpers, only: [await_connected: 1, await_connected: 2, await_disconnected: 1, await_disconnected: 2]
 
   setup do
     test_pid = self()
@@ -32,15 +32,7 @@ defmodule ExCodeRemote.TelemetryTest do
     {:ok, handler_id: handler_id}
   end
 
-  defp setup_server(_context) do
-    {:ok, server} =
-      Bandit.start_link(plug: ExCodeRemote.Router, port: 0, scheme: :http)
-
-    {:ok, {_addr, port}} = ThousandIsland.listener_info(server)
-
-    on_exit(fn -> Process.exit(server, :kill) end)
-    {:ok, port: port}
-  end
+  defp setup_server(ctx), do: ExCodeRemote.Test.Helpers.setup_server(ctx)
 
   describe "dispatcher events" do
     setup :setup_server

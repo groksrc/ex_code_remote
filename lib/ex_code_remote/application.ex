@@ -14,7 +14,7 @@ defmodule ExCodeRemote.Application do
       {DynamicSupervisor, strategy: :one_for_one, name: ExCodeRemote.AgentSupervisor},
       ExCodeRemote.Audit.Repo,
       {Task.Supervisor, name: ExCodeRemote.Audit.TaskSupervisor, max_children: 100},
-      {Bandit, plug: ExCodeRemote.Router, port: port, scheme: :http}
+      {Plug.Cowboy, plug: ExCodeRemote.Router, scheme: :http, options: [port: port]}
     ]
 
     opts = [strategy: :one_for_one, name: ExCodeRemote.Supervisor]

@@ -3,22 +3,13 @@ defmodule ExCodeRemote.Commands.DispatcherTest do
 
   alias ExCodeRemote.Commands.{Dispatcher, Codec}
   alias ExCodeRemote.Test.FakeAgent
-  import ExCodeRemote.Test.Helpers
+  import ExCodeRemote.Test.Helpers, only: [await_connected: 1, await_connected: 2]
 
   @token "test-token-for-testing"
 
-  setup do
-    {:ok, server} =
-      Bandit.start_link(plug: ExCodeRemote.Router, port: 0, scheme: :http)
+  setup :setup_server
 
-    {:ok, {_addr, port}} = ThousandIsland.listener_info(server)
-
-    on_exit(fn ->
-      Process.exit(server, :kill)
-    end)
-
-    {:ok, port: port}
-  end
+  defp setup_server(ctx), do: ExCodeRemote.Test.Helpers.setup_server(ctx)
 
   describe "command ID generation" do
     test "generates 16-character URL-safe string" do

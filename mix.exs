@@ -43,7 +43,7 @@ defmodule ExCodeRemote.MixProject do
   # Run "mix help deps" to learn about dependencies.
   defp deps do
     [
-      {:bandit, "~> 1.10"},
+      {:plug_cowboy, "~> 2.8"},
       {:plug, "~> 1.17"},
       {:ex_mcp, "== 0.9.1"},
       {:jason, "~> 1.4"},
