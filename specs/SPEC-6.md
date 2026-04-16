@@ -11,7 +11,7 @@ tags:
 
 # SPEC-6: Audit Log
 
-Status: Spec-Reviewed
+Status: Implemented
 
 ## Why
 

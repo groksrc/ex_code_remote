@@ -22,7 +22,7 @@ defmodule ExCodeRemote.Application do
 
     case result do
       {:ok, _pid} ->
-        auto_migrate()
+        unless release_mode?(), do: auto_migrate()
         ExCodeRemote.Telemetry.attach()
         ExCodeRemote.Audit.attach()
         Logger.info("ExCodeRemote started on port #{port}")
@@ -32,6 +32,10 @@ defmodule ExCodeRemote.Application do
     end
 
     result
+  end
+
+  defp release_mode? do
+    System.get_env("RELEASE_NAME") != nil
   end
 
   defp validate_auth_token! do

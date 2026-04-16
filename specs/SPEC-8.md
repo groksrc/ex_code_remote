@@ -12,7 +12,7 @@ tags:
 
 # SPEC-8: Deployment
 
-Status: Spec-Reviewed
+Status: Implemented
 
 ## Why
 
