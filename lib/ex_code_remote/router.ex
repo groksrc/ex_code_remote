@@ -5,8 +5,16 @@ defmodule ExCodeRemote.Router do
 
   plug(ExCodeRemote.Plugs.RequestTiming)
   plug(:match)
-  plug(Plug.Parsers, parsers: [:json], json_decoder: Jason)
+  plug(:maybe_parse_body)
   plug(:dispatch)
+
+  # Skip Plug.Parsers for /mcp routes — ExMCP reads the body itself.
+  # Plug.Parsers consumes the request body, leaving nothing for ExMCP to read.
+  defp maybe_parse_body(%{path_info: ["mcp" | _]} = conn, _opts), do: conn
+
+  defp maybe_parse_body(conn, _opts) do
+    Plug.Parsers.call(conn, Plug.Parsers.init(parsers: [:json], json_decoder: Jason))
+  end
 
   get "/health" do
     body =
