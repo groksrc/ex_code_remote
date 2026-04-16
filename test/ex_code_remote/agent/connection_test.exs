@@ -9,7 +9,12 @@ defmodule ExCodeRemote.Agent.ConnectionTest do
   end
 
   defp start_connection(machine) do
-    dummy_socket = spawn(fn -> Process.sleep(:infinity) end)
+    dummy_socket =
+      spawn(fn ->
+        receive do
+          _ -> :ok
+        end
+      end)
 
     pid =
       start_supervised!(%{
@@ -53,11 +58,6 @@ defmodule ExCodeRemote.Agent.ConnectionTest do
     assert Process.alive?(pid)
   end
 
-  test "dispatch returns {:error, :not_implemented}", %{machine: machine} do
-    {pid, _socket} = start_connection(machine)
-    assert {:error, :not_implemented} = GenServer.call(pid, {:dispatch, %{type: :shell}})
-  end
-
   test "initial state has empty pending map and connected_at", %{machine: machine} do
     {pid, _socket} = start_connection(machine)
 
@@ -65,5 +65,54 @@ defmodule ExCodeRemote.Agent.ConnectionTest do
     assert state.pending == %{}
     assert %DateTime{} = state.connected_at
     assert state.machine == machine
+  end
+
+  test "terminate replies to all pending callers with :agent_disconnected", %{machine: machine} do
+    # Use a socket that stays alive and accepts :send_frame messages
+    socket =
+      spawn(fn ->
+        receive_loop = fn loop ->
+          receive do
+            _ -> loop.(loop)
+          end
+        end
+
+        receive_loop.(receive_loop)
+      end)
+
+    pid =
+      start_supervised!(%{
+        id: machine,
+        start: {Connection, :start_link, [{machine, socket}]},
+        restart: :temporary
+      })
+
+    # Spawn callers that will block on dispatch
+    tasks =
+      for i <- 1..3 do
+        Task.async(fn ->
+          GenServer.call(
+            pid,
+            {:dispatch, "cmd-#{i}", %{type: :shell, command: "echo", timeout: 30}},
+            10_000
+          )
+        end)
+      end
+
+    # Wait for all calls to be in the pending map
+    Process.sleep(100)
+
+    # Verify they're pending
+    state = :sys.get_state(pid)
+    assert map_size(state.pending) == 3
+
+    # Stop the connection
+    GenServer.stop(pid, :shutdown)
+
+    results = Task.await_many(tasks, 5000)
+
+    for result <- results do
+      assert {:error, :agent_disconnected} = result
+    end
   end
 end

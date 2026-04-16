@@ -30,7 +30,8 @@ defmodule ExCodeRemote.MixProject do
       {:plug, "~> 1.17"},
       {:ex_mcp, "== 0.9.1"},
       {:jason, "~> 1.4"},
-      {:websock_adapter, "~> 0.5"}
+      {:websock_adapter, "~> 0.5"},
+      {:telemetry, "~> 1.2"}
     ]
   end
 end

@@ -69,21 +69,10 @@ defmodule ExCodeRemote.Agent do
     end
   end
 
-  @spec dispatch(String.t(), map(), timeout()) ::
-          {:ok, map()} | {:error, :not_connected | :timeout | :not_implemented}
-  def dispatch(machine, command, timeout \\ 30_000) do
-    case Registry.lookup(@registry, machine) do
-      [{pid, _}] ->
-        try do
-          GenServer.call(pid, {:dispatch, command}, timeout)
-        catch
-          :exit, {:noproc, _} -> {:error, :not_connected}
-          :exit, {:normal, _} -> {:error, :not_connected}
-          :exit, {:shutdown, _} -> {:error, :not_connected}
-        end
-
-      [] ->
-        {:error, :not_connected}
-    end
+  @spec dispatch(String.t(), map(), pos_integer()) ::
+          {:ok, map()} | {:error, :not_connected | :timeout | :agent_disconnected}
+  def dispatch(machine, command, timeout_s \\ 60) do
+    command = Map.put_new(command, :timeout, timeout_s)
+    ExCodeRemote.Commands.Dispatcher.run(machine, command)
   end
 end

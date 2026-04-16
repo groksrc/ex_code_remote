@@ -19,9 +19,11 @@ Audit is useful for: debugging, support ("did Claude run anything weird on my ma
 
 ## What
 
+**Dependencies:** SPEC-4 (dispatcher with telemetry events) must be complete. The audit writer subscribes to the dispatcher's telemetry events defined in SPEC-4 — specifically `:start` and `:stop` events. SPEC-5 (MCP tools) should ideally be complete so end-to-end audit testing is possible, but is not strictly required since the audit writer subscribes to dispatcher events regardless of what triggers them.
+
 **In scope:**
 
-- `ExCodeRemote.Audit` — the writer module, subscribed to dispatcher telemetry events
+- `ExCodeRemote.Audit` — the writer module, subscribed to dispatcher telemetry events from SPEC-4
 - Ecto schema and migration for a `commands` table
 - `exqlite` / `ecto_sqlite3` adapter
 - `Audit.Repo` as a supervised process in the application tree
@@ -51,10 +53,10 @@ Indexes on `status`, `(machine, started_at DESC)`, and `(started_at DESC)`.
 
 ### Audit Writer
 
-`ExCodeRemote.Audit` attaches to the dispatcher's telemetry events from SPEC-4:
+`ExCodeRemote.Audit` attaches to the dispatcher's telemetry events defined in SPEC-4:
 
-- On the `:start` event, it inserts a row with `status: "running"` and the command metadata.
-- On the `:stop` event, it updates the row with the final status, duration, and completion timestamp.
+- On the `[:ex_code_remote, :dispatcher, :command, :start]` event, it inserts a row with `status: "running"` and the command metadata.
+- On the `[:ex_code_remote, :dispatcher, :command, :stop]` event, it updates the row with the final status, duration, and completion timestamp.
 
 The writer runs each database operation asynchronously via a Task.Supervisor so the dispatcher is never blocked on disk I/O. Each handler is wrapped in error rescue — if the Repo is down or the write fails, it logs an error but never propagates the exception to the dispatcher's process.
 
@@ -62,7 +64,7 @@ The writer runs each database operation asynchronously via a Task.Supervisor so 
 
 ### Supervision
 
-The application supervisor gains two new children: the `Audit.Repo` (Ecto repository) and an `Audit.TaskSupervisor` for the async write tasks. The telemetry attachment is called at application start.
+The application supervisor gains two new children: the `Audit.Repo` (Ecto repository) and an `Audit.TaskSupervisor` for the async write tasks. Both should be started before Bandit in the supervision tree. The telemetry attachment is called at application start.
 
 ### Debug Endpoint
 
@@ -70,7 +72,15 @@ A `GET /commands` route in the router, authenticated via bearer token (same `AUT
 
 ### Config
 
-The Repo is configured in `runtime.exs` with the database path from the `DATABASE_PATH` env var (default `priv/data/audit.db`), a pool size of 5, and WAL journal mode for concurrent reads while writes are in progress.
+The Repo is configured in `runtime.exs`:
+
+- **Dev/test:** database path defaults to `priv/data/audit.db` (relative to project root)
+- **Prod:** reads `DATABASE_PATH` env var, defaulting to `/data/audit.db` (the Fly.io volume mount from SPEC-8)
+- Pool size of 5, WAL journal mode for concurrent reads while writes are in progress
+
+### Test Setup
+
+Tests that hit the Repo need a database. Use `Ecto.Adapters.SQL.Sandbox` in test mode so each test gets an isolated transaction that rolls back after the test completes. The test config should point the Repo at a test-specific database path (e.g. `priv/data/test.db`). Migrations must run before the test suite — add a `test/support/repo_case.ex` or equivalent that sets up the sandbox checkout.
 
 ## How to Evaluate
 
@@ -89,7 +99,7 @@ The Repo is configured in `runtime.exs` with the database path from the `DATABAS
 Tests should be included with the implementation changes:
 
 - **Schema roundtrip**: insert a Command record, fetch it, assert fields match.
-- **Dispatch produces audit row**: dispatch a command via FakeAgent, allow async tasks to flush, assert exactly one audit row exists with the correct status and non-negative duration.
+- **Dispatch produces audit row**: dispatch a command via a fake agent, allow async tasks to flush, assert exactly one audit row exists with the correct status and non-negative duration.
 - **Audit failure isolation**: simulate a Repo failure (e.g. stop the Repo process), dispatch a command, assert the dispatch still returns `{:ok, _}` and an error log line is emitted.
 - **Latency**: round-trip dispatch with audit attached remains under 10ms.
 - **Debug endpoint auth**: `GET /commands` without auth returns 401, with valid auth returns 200 and a JSON array.
@@ -105,13 +115,15 @@ Tests should be included with the implementation changes:
 - Storing the `content` field for `write_file` would blow up the DB on anything non-trivial. We record `path` and `type`; if you need to reconstruct the write, look at the client-side chat history.
 - The debug endpoint is intentionally minimal. Anything richer (filters, pagination, search) should wait until there's a concrete user complaint.
 - If the audit log ever becomes a hotspot, the Task.Supervisor fan-out can be replaced with a batching writer GenServer. Not needed at expected volumes.
+- The `exqlite` NIF requires a C compiler at build time and the SQLite shared library at runtime. The SPEC-8 Dockerfile must include these in the appropriate build/runtime stages.
 
 ## Observations
 
 - [decision] Ecto + SQLite + WAL — boring, proven, zero ops overhead, single-file backup story
-- [decision] Audit writer subscribes to telemetry events emitted by the dispatcher — zero coupling in the hot path
+- [decision] Audit writer subscribes to telemetry events emitted by the dispatcher in SPEC-4 — zero coupling in the hot path
 - [decision] Async writes via Task.Supervisor — audit latency is invisible to the dispatcher
 - [decision] `content` field deliberately not stored — audit should not become a blob store
 - [decision] `/commands` debug endpoint reuses `AUTH_TOKEN` — not worth a separate secret for an operator-only endpoint
+- [decision] Dev uses `priv/data/audit.db`, prod uses `DATABASE_PATH` env var — environment-appropriate defaults
 - [invariant] Audit writer failures must never propagate to the dispatcher — enforced by rescue + async task
 - [pattern] Telemetry events from SPEC-4 are the integration surface — not a direct call from the dispatcher

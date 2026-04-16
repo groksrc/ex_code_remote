@@ -12,7 +12,7 @@ tags:
 
 # SPEC-3: Agent WebSocket and Connection Lifecycle
 
-Status: Spec-Reviewed
+Status: Implemented
 
 ## Why
 

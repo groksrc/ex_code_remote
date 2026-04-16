@@ -4,6 +4,12 @@ defmodule ExCodeRemote.Agent.Connection do
   use GenServer, restart: :temporary
   require Logger
 
+  alias ExCodeRemote.Commands.Codec
+
+  # Server-side timeout guard adds more slack than the caller's GenServer.call timeout
+  # so in normal operation, the caller times out first.
+  @server_timeout_slack_ms 10_000
+
   defstruct [:machine, :socket_pid, :connected_at, pending: %{}]
 
   def start_link({machine, socket_pid}) do
@@ -28,6 +34,7 @@ defmodule ExCodeRemote.Agent.Connection do
 
   @impl true
   def init({machine, socket_pid}) do
+    Process.flag(:trap_exit, true)
     Process.monitor(socket_pid)
     Logger.info("Agent connected: #{machine}")
 
@@ -40,20 +47,64 @@ defmodule ExCodeRemote.Agent.Connection do
   end
 
   @impl true
-  def handle_call({:dispatch, _command}, _from, state) do
-    {:reply, {:error, :not_implemented}, state}
+  def handle_call({:dispatch, command_id, command}, from, state) do
+    if not Process.alive?(state.socket_pid) do
+      {:reply, {:error, :not_connected}, state}
+    else
+      frame = Codec.encode_execute(command_id, command)
+      send(state.socket_pid, {:send_frame, frame})
+
+      timeout_ms = command[:timeout] * 1_000 + @server_timeout_slack_ms
+      timer_ref = Process.send_after(self(), {:command_timeout, command_id}, timeout_ms)
+
+      new_pending = Map.put(state.pending, command_id, {from, timer_ref})
+      {:noreply, %{state | pending: new_pending}}
+    end
   end
 
   @impl true
-  def handle_cast({:result, %{"id" => _id} = _frame}, state) do
-    # Stub — SPEC-4 will use the pending map to correlate results
-    {:noreply, state}
+  def handle_cast({:result, %{"id" => id} = frame}, state) do
+    case Map.pop(state.pending, id) do
+      {nil, _pending} ->
+        Logger.debug("Ignoring result for unknown command ID: #{id}")
+        {:noreply, state}
+
+      {{from, timer_ref}, new_pending} ->
+        Process.cancel_timer(timer_ref)
+
+        case Codec.decode_result(frame) do
+          {:ok, result} ->
+            GenServer.reply(from, {:ok, result})
+            {:noreply, %{state | pending: new_pending}}
+
+          {:error, :malformed} ->
+            # Discard malformed frame, leave pending entry for timeout guard
+            Logger.debug("Malformed result frame for command #{id}, discarding")
+
+            new_timer =
+              Process.send_after(self(), {:command_timeout, id}, @server_timeout_slack_ms)
+
+            restored = Map.put(new_pending, id, {from, new_timer})
+            {:noreply, %{state | pending: restored}}
+        end
+    end
   end
 
   @impl true
   def handle_cast({:result, _frame}, state) do
-    # Result frame missing id — ignore
     {:noreply, state}
+  end
+
+  @impl true
+  def handle_info({:command_timeout, command_id}, state) do
+    case Map.pop(state.pending, command_id) do
+      {nil, _pending} ->
+        {:noreply, state}
+
+      {{from, _timer_ref}, new_pending} ->
+        GenServer.reply(from, {:error, :timeout})
+        {:noreply, %{state | pending: new_pending}}
+    end
   end
 
   @impl true
@@ -69,9 +120,17 @@ defmodule ExCodeRemote.Agent.Connection do
   end
 
   @impl true
+  def handle_info(_msg, state) do
+    {:noreply, state}
+  end
+
+  @impl true
   def terminate(_reason, state) do
-    # Best-effort: instruct socket to close with 1001 (going away).
-    # send/2 to a dead PID is a silent no-op, so no guard needed.
+    for {_id, {from, timer_ref}} <- state.pending do
+      Process.cancel_timer(timer_ref)
+      GenServer.reply(from, {:error, :agent_disconnected})
+    end
+
     send(state.socket_pid, {:close, 1001, "going away"})
     :ok
   end

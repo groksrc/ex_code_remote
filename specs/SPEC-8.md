@@ -20,10 +20,12 @@ The goal is to get the new server running *alongside* the Python server for a st
 
 ## What
 
+**Dependencies:** All prior specs (SPEC-1 through SPEC-7) must be complete.
+
 **In scope:**
 
 - Mix release configuration
-- Multi-stage Dockerfile producing an OTP release image
+- Multi-stage Dockerfile producing an OTP release image (must include SQLite native libraries for exqlite from SPEC-6)
 - `fly.toml` with volume mount for the audit DB
 - `config/runtime.exs` reading all prod config from env vars
 - Secrets contract: `AUTH_TOKEN`, `DATABASE_PATH`, `PORT`
@@ -48,9 +50,11 @@ Configure `mix release` in `mix.exs` targeting Unix, including runtime_tools for
 
 A multi-stage build following the standard Elixir release pattern:
 
-**Build stage:** Uses the official `hexpm/elixir` Alpine image. Installs build dependencies, copies mix files, fetches and compiles deps, copies source, compiles the release.
+**Build stage:** Uses the official `hexpm/elixir` Alpine image. Installs build dependencies including a C compiler (for exqlite's NIF) and SQLite development headers. Copies mix files, fetches and compiles deps, copies source, compiles the release.
 
-**Runtime stage:** Minimal Alpine image with only runtime dependencies (openssl, ncurses, libstdc++, libgcc). Copies the release from the build stage. Sets `PORT=8080` and `DATABASE_PATH=/data/audit.db` as defaults. The entry command runs migrations then starts the release.
+**Runtime stage:** Minimal Alpine image with only runtime dependencies (openssl, ncurses, libstdc++, libgcc, and the SQLite shared library). Copies the release from the build stage. Sets `PORT=8080` and `DATABASE_PATH=/data/audit.db` as defaults. The entry command runs migrations then starts the release.
+
+Note: the `runtime.exs` default for PORT is 4000 (for local dev), but the Dockerfile's `ENV PORT=8080` overrides this for the deployed environment. This is intentional — dev and prod use different ports.
 
 ### fly.toml
 
@@ -64,7 +68,7 @@ Key settings:
 
 ### Runtime Config
 
-All production configuration reads from environment variables in `runtime.exs`: `PORT` (default 8080), `AUTH_TOKEN` (required, fails loudly if missing), `DATABASE_PATH` (default `/data/audit.db`), and the JSON log formatter for production.
+All production configuration reads from environment variables in `runtime.exs`: `PORT` (default 8080 in the Dockerfile, 4000 locally), `AUTH_TOKEN` (required — the application refuses to start without it, per SPEC-3), `DATABASE_PATH` (default `/data/audit.db` in prod, `priv/data/audit.db` in dev), and the JSON log formatter for production (per SPEC-7).
 
 ### Secrets
 
@@ -145,5 +149,6 @@ There is also a manual deploy validation checklist:
 - [decision] Cutover runs the new server alongside the old, switches agent via env var — instant rollback, zero data migration
 - [decision] Migrations run on start via release eval command — no separate migration step, deploy is atomic
 - [decision] Bake for a week before retiring the Python server — stability is the whole point of the port, prove it before committing
+- [decision] Dockerfile must include SQLite libs for exqlite NIF — both build-time (headers + compiler) and runtime (shared lib)
 - [constraint] WebSocket state is in-process, so we cannot horizontally scale without a distributed registry
 - [risk] `auto_stop_machines = false` must not regress — add a deploy check or doc warning

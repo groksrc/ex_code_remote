@@ -15,21 +15,24 @@ tags:
 
 The Python server accumulated an event-loop stall watchdog, per-session duration logging, disconnect reason tracking, and PYTHONUNBUFFERED=1 — all because something was going wrong that the operator couldn't see. The BEAM equivalent of "event loop is stalled" doesn't exist (preemptive scheduling), but operators still need answers to: how long are commands taking, are agents reconnecting too often, is the dispatcher piling up pending work?
 
-Rather than hand-rolled log lines, this spec defines a **telemetry event contract** that downstream consumers (logs, metrics, dashboards) can subscribe to. The dispatcher and connection processes emit events; a telemetry handler converts them to structured logs now, and gives us a clean seam to add metrics reporters later without touching business logic.
+Rather than hand-rolled log lines, this spec defines a **telemetry event contract** that downstream consumers (logs, metrics, dashboards) can subscribe to. It formalizes the events already emitted by prior specs and adds new ones for agent lifecycle and HTTP request timing.
 
 ## What
 
+**Dependencies:** SPEC-4 (dispatcher telemetry events already emitted) and SPEC-3 (connection lifecycle, currently uses Logger.info for lifecycle events). This spec extends both with formal telemetry.
+
 **In scope:**
 
-- A documented list of telemetry events emitted across the codebase
+- A documented list of all telemetry events emitted across the codebase, including those already emitted by SPEC-4
 - `ExCodeRemote.Telemetry` module that attaches a handler and emits structured log lines (JSON) for each event
 - Logger configuration for JSON formatting in production, human-readable in dev
-- A minimal `ExCodeRemote.Telemetry.Metrics` module that defines Telemetry.Metrics specs for the events — not wired to a reporter yet, but documented so SPEC-8 (deployment) can plug in a reporter of choice
+- A minimal `ExCodeRemote.Telemetry.Metrics` module that defines Telemetry.Metrics specs — not wired to a reporter yet, but ready for SPEC-8 to plug one in
+- New telemetry events added to Connection (agent lifecycle) and Router (HTTP timing)
 
 **Out of scope:**
 
-- LiveDashboard (nice-to-have, but drags in Phoenix LiveView for a headless service)
-- Prometheus / StatsD / OpenTelemetry reporters — the events and metrics definitions land here, the reporter choice lands in SPEC-8 or later
+- LiveDashboard (drags in Phoenix LiveView for a headless service)
+- Prometheus / StatsD / OpenTelemetry reporters — the reporter choice lands in SPEC-8 or later
 - Distributed tracing
 - Custom log backends
 
@@ -37,7 +40,9 @@ Rather than hand-rolled log lines, this spec defines a **telemetry event contrac
 
 All events are under the `[:ex_code_remote, …]` namespace.
 
-### Dispatcher Events (emitted in SPEC-4)
+### Dispatcher Events (already emitted by SPEC-4)
+
+These events are defined and emitted in SPEC-4. This spec documents them as part of the unified contract and wires the Telemetry log handler to them. SPEC-6 (audit) also subscribes to these events.
 
 | event | measurement | metadata |
 |---|---|---|
@@ -45,7 +50,9 @@ All events are under the `[:ex_code_remote, …]` namespace.
 | `[:ex_code_remote, :dispatcher, :command, :stop]` | `duration` (native time units) | `machine`, `command_id`, `type`, `status` |
 | `[:ex_code_remote, :dispatcher, :command, :exception]` | `duration` | `machine`, `command_id`, `type`, `kind`, `reason`, `stacktrace` |
 
-### Agent Connection Events (emitted in SPEC-3, additions here)
+### Agent Connection Events (added by this spec)
+
+These events are added to the Connection GenServer in this spec, replacing or supplementing the Logger.info calls from SPEC-3.
 
 | event | measurement | metadata |
 |---|---|---|
@@ -53,7 +60,9 @@ All events are under the `[:ex_code_remote, …]` namespace.
 | `[:ex_code_remote, :agent, :disconnected]` | `duration` (session length, native) | `machine`, `reason`, `pending_count` |
 | `[:ex_code_remote, :agent, :replaced]` | `system_time` | `machine` (emitted when a reconnect supplants a previous connection) |
 
-### HTTP Events (emitted in router, additions here)
+### HTTP Events (added by this spec)
+
+Added via a small Plug in the router pipeline that times each request.
 
 | event | measurement | metadata |
 |---|---|---|
@@ -69,7 +78,7 @@ Sensitive fields (`content`, `auth_token`) are dropped from metadata before logg
 
 ### Logger Config
 
-In production, use a JSON log formatter (such as `logger_json`) so logs can be piped into `jq` or ingested by a log aggregator. In dev, keep the default human-readable formatter. This split is configured in `runtime.exs`.
+In production, use a JSON log formatter (such as `logger_json`) so logs can be piped into `jq` or ingested by a log aggregator. In dev, keep the default human-readable formatter. This split is configured in `runtime.exs`. The `logger_json` dependency should be added with `only: :prod` if possible, or unconditionally if the formatter needs to be available for testing prod-like config.
 
 ### Metrics Definitions
 
@@ -79,15 +88,13 @@ These are **definitions only** in this spec — no reporter is started. SPEC-8 c
 
 ### Dependencies
 
-Add Telemetry (`~> 1.2`), Telemetry.Metrics (`~> 1.0`), and a JSON log formatter (such as `logger_json ~> 6.0`) to deps.
+Telemetry (`~> 1.2`) is likely already a transitive dependency via Bandit/ThousandIsland, but should be listed explicitly to ensure version compatibility. Add Telemetry.Metrics (`~> 1.0`) and a JSON log formatter (such as `logger_json ~> 6.0`) to deps.
 
-### Adding Events to Existing Code
+### Changes to Existing Code
 
-This spec revisits the dispatcher (SPEC-4) and connection (SPEC-3) to emit the events above. The changes are mechanical:
-
-- Dispatcher: wrap `run/2` in a telemetry span.
-- Connection: emit telemetry events on register and terminate.
-- Router: a small Plug that times each request and emits an event via `before_send`.
+- **Dispatcher (SPEC-4):** Already emits telemetry events via `:telemetry.span/3`. No changes needed.
+- **Connection (SPEC-3):** Add `:telemetry.execute/3` calls on init (`:connected`), terminate (`:disconnected` with session duration and pending count), and in the Agent facade during reconnect replacement (`:replaced`).
+- **Router:** Add a small Plug that records the start time in `before_send` and emits the HTTP request stop event with duration, method, path, and status.
 
 ## How to Evaluate
 
@@ -104,8 +111,8 @@ This spec revisits the dispatcher (SPEC-4) and connection (SPEC-3) to emit the e
 
 Tests should be included with the implementation changes:
 
-- **Telemetry event capture**: attach a test handler, dispatch a command through FakeAgent, assert `:start` and `:stop` events received with expected metadata.
-- **Connection events**: connect/disconnect a FakeAgent, assert `:connected` and `:disconnected` events received with the machine name.
+- **Telemetry event capture**: attach a test handler, dispatch a command through a fake agent, assert `:start` and `:stop` events received with expected metadata.
+- **Connection events**: connect/disconnect a fake agent, assert `:connected` and `:disconnected` events received with the machine name.
 - **HTTP event**: make a request to `/health`, assert the HTTP stop event fires with `status: 200`.
 - **Metadata scrubbing**: assert that a telemetry event containing `content` or `auth_token` in its metadata has those fields dropped in the log output.
 - **Large value truncation**: a metadata field with a 10KB string is truncated to 200 bytes in the log output.
@@ -127,7 +134,8 @@ Tests should be included with the implementation changes:
 - [decision] Telemetry events are the contract, log lines are one consumer — lets us add dashboards/metrics later without touching business logic
 - [decision] JSON logs in prod, human-readable in dev — standard split, makes local debugging pleasant and prod logs machine-readable
 - [decision] No reporter in this spec — reporter choice depends on deploy environment, defer to SPEC-8
-- [decision] Scrub `content` and `auth_token` from metadata — audit log should not contain blobs, logs should not contain secrets
+- [decision] Scrub `content` and `auth_token` from metadata — logs should not contain blobs or secrets
 - [decision] Telemetry.Metrics definitions co-located with the events — single source of truth for what the service measures
+- [decision] Dispatcher events already exist from SPEC-4; this spec formalizes the contract and adds agent/HTTP events
 - [pattern] Telemetry span for the dispatcher hot path — idiomatic, correctly propagates exceptions as `:exception` events
 - [anti-pattern] Hand-rolled event-loop stall watchdog — not needed on BEAM, removed structurally

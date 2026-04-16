@@ -25,15 +25,17 @@ With the core proven stable after SPEC-8's bake, this spec adds the network chec
 
 ## What
 
+**Dependencies:** SPEC-8 (deployment, Dockerfile) must be complete. This spec modifies the Dockerfile from SPEC-8 and adds a new Plug to the router from SPEC-3.
+
 **In scope:**
 
 - `ExCodeRemote.Plugs.PrivateNetwork` — a Plug that checks the effective client IP against an allow-list
 - IP extraction from `x-forwarded-for` header, falling back to the direct connection IP
 - Tailscale CGNAT range (`100.64.0.0/10`) allowed by default
 - Loopback addresses (`127.0.0.1`, `::1`) allowed unconditionally (dev)
-- Env-gated: `REQUIRE_PRIVATE_NETWORK=true` by default; `false` disables the check entirely
+- Env-gated: `REQUIRE_PRIVATE_NETWORK=true` by default in prod; `false` in dev and test
 - Plug applied **only** to `/ws/agent`, never to the MCP SSE endpoint (Claude.ai needs public access)
-- Tailscale daemon in the Dockerfile, started before the Elixir release via an entrypoint script
+- Tailscale daemon added to the SPEC-8 Dockerfile, started before the Elixir release via an entrypoint script
 - `TAILSCALE_AUTHKEY` Fly secret, following the Python server's existing pattern
 
 **Out of scope:**
@@ -64,11 +66,11 @@ The plug is applied inline on the `/ws/agent` route only, before the existing au
 
 ### Runtime Config
 
-The `REQUIRE_PRIVATE_NETWORK` env var (default `"true"`) is read in `runtime.exs` and stored in application config.
+The `REQUIRE_PRIVATE_NETWORK` env var (default `"true"` in prod) is read in `runtime.exs` and stored in application config. The test config (`config/test.exs`) must set this to `false` so that existing WebSocket tests from SPEC-3 continue to pass without Tailscale IPs.
 
 ### Dockerfile Changes
 
-The runtime stage of the Dockerfile gains the Tailscale binaries (copied from the official `tailscale/tailscale` image). The entry command becomes a shell script that:
+Modify the Dockerfile from SPEC-8: add the Tailscale binaries (copied from the official `tailscale/tailscale` image) to the runtime stage. Replace the entry command with a shell script that:
 
 1. If `TAILSCALE_AUTHKEY` is set, starts `tailscaled` in the background and runs `tailscale up` with the auth key.
 2. Runs database migrations.
@@ -97,6 +99,7 @@ Agents need their `RELAY_URL` pointed at the server's Tailscale IP (not the publ
 - [ ] Tailscale daemon starts successfully in the Fly deployment
 - [ ] Agent connects to the server's Tailscale IP and functions end-to-end
 - [ ] Leaking `AUTH_TOKEN` does not allow a non-tailnet attacker to register as an agent
+- [ ] Existing SPEC-3 WebSocket tests pass without modification (test config has `REQUIRE_PRIVATE_NETWORK=false`)
 
 ### Tests
 
@@ -108,6 +111,7 @@ Tests should be included with the implementation changes:
 - **Direct connection fallback**: when no `x-forwarded-for` is present, `conn.remote_ip` is used.
 - **Feature gate**: with `REQUIRE_PRIVATE_NETWORK=false`, all IPs are allowed.
 - **Router integration**: with the plug active, a non-Tailscale `x-forwarded-for` on `/ws/agent` returns 403 before WebSocket upgrade. A request to the MCP endpoint is not gated, regardless of client IP.
+- **Existing tests unbroken**: all SPEC-3 WebSocket tests continue to pass.
 
 Deploy validation:
 
@@ -132,8 +136,9 @@ Deploy validation:
 - [decision] Plug applied only to `/ws/agent`, never to MCP — Claude.ai is a public service, the tailnet gate is for agent registration
 - [decision] Manual CIDR check, no new dependency — one `/10` check is not worth a library
 - [decision] Fail closed — parse errors and unknown formats deny
-- [decision] Env-gated via `REQUIRE_PRIVATE_NETWORK` — lets dev run without Tailscale and prod run with it
+- [decision] Env-gated via `REQUIRE_PRIVATE_NETWORK` — prod defaults to true, dev/test default to false
 - [decision] Tailscale daemon started by a shell entrypoint before the Elixir release — matches the Python server's `start.sh` pattern, no OTP-side coupling
 - [decision] Shipped last because it is additive, fiddly, and the core needs to be proven first
 - [constraint] Reuses the Python server's `100.64.0.0/10` range and `TAILSCALE_AUTHKEY` secret — same tailnet, same operational story
+- [constraint] Test config must disable the plug so SPEC-3 tests don't break
 - [risk] Tailscale auth key expires every 90 days; rotation is manual and must be calendared
