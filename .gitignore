@@ -15,6 +15,7 @@ crash.log
 *.db
 *.db-journal
 *.db-wal
+*.db-shm
 /priv/data/
 
 # Environment

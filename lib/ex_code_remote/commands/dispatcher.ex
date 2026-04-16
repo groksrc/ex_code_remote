@@ -16,20 +16,23 @@ defmodule ExCodeRemote.Commands.Dispatcher do
     command_id = Codec.generate_command_id()
     command_type = command[:type]
     resolved_timeout = command[:timeout] || @default_timeout
+    command_with_timeout = Map.put_new(command, :timeout, resolved_timeout)
 
     mono_start = System.monotonic_time()
+    started_at = DateTime.utc_now()
 
     :telemetry.execute(@telemetry_start, %{system_time: System.system_time()}, %{
       machine: machine,
       command_id: command_id,
-      command_type: command_type
+      command_type: command_type,
+      command: command_with_timeout,
+      started_at: started_at
     })
 
     result =
       case Registry.lookup(@registry, machine) do
         [{pid, _}] ->
           call_timeout = resolved_timeout * 1_000 + @timeout_slack_ms
-          command_with_timeout = Map.put_new(command, :timeout, resolved_timeout)
 
           try do
             GenServer.call(pid, {:dispatch, command_id, command_with_timeout}, call_timeout)
@@ -47,17 +50,21 @@ defmodule ExCodeRemote.Commands.Dispatcher do
 
     duration = System.monotonic_time() - mono_start
 
-    status =
+    {status, result_data} =
       case result do
-        {:ok, _} -> :ok
-        {:error, reason} -> reason
+        {:ok, data} -> {:ok, data}
+        {:error, reason} -> {reason, nil}
       end
 
     :telemetry.execute(@telemetry_stop, %{duration: duration}, %{
       machine: machine,
       command_id: command_id,
       command_type: command_type,
-      status: status
+      command: command_with_timeout,
+      started_at: started_at,
+      status: status,
+      result: result_data,
+      duration_ms: System.convert_time_unit(duration, :native, :millisecond)
     })
 
     result

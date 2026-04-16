@@ -8,7 +8,8 @@ defmodule ExCodeRemote.MixProject do
       elixir: "~> 1.19",
       elixirc_paths: elixirc_paths(Mix.env()),
       start_permanent: Mix.env() == :prod,
-      deps: deps()
+      deps: deps(),
+      aliases: aliases()
     ]
   end
 
@@ -23,6 +24,12 @@ defmodule ExCodeRemote.MixProject do
   defp elixirc_paths(:test), do: ["lib", "test/support"]
   defp elixirc_paths(_), do: ["lib"]
 
+  defp aliases do
+    [
+      test: ["ecto.create --quiet", "ecto.migrate --quiet", "test"]
+    ]
+  end
+
   # Run "mix help deps" to learn about dependencies.
   defp deps do
     [
@@ -31,7 +38,9 @@ defmodule ExCodeRemote.MixProject do
       {:ex_mcp, "== 0.9.1"},
       {:jason, "~> 1.4"},
       {:websock_adapter, "~> 0.5"},
-      {:telemetry, "~> 1.2"}
+      {:telemetry, "~> 1.2"},
+      {:ecto_sql, "~> 3.12"},
+      {:ecto_sqlite3, "~> 0.17"}
     ]
   end
 end

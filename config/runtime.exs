@@ -27,3 +27,12 @@ config :ex_code_remote, port: port
 if auth_token = System.get_env("AUTH_TOKEN") do
   config :ex_code_remote, auth_token: auth_token
 end
+
+if config_env() == :prod do
+  database_path = System.get_env("DATABASE_PATH", "/data/audit.db")
+
+  config :ex_code_remote, ExCodeRemote.Audit.Repo,
+    database: database_path,
+    pool_size: 1,
+    journal_mode: :wal
+end

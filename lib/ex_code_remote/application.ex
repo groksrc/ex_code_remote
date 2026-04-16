@@ -12,6 +12,8 @@ defmodule ExCodeRemote.Application do
     children = [
       {Registry, keys: :unique, name: ExCodeRemote.AgentRegistry},
       {DynamicSupervisor, strategy: :one_for_one, name: ExCodeRemote.AgentSupervisor},
+      ExCodeRemote.Audit.Repo,
+      {Task.Supervisor, name: ExCodeRemote.Audit.TaskSupervisor, max_children: 100},
       {Bandit, plug: ExCodeRemote.Router, port: port, scheme: :http}
     ]
 
@@ -20,6 +22,8 @@ defmodule ExCodeRemote.Application do
 
     case result do
       {:ok, _pid} ->
+        auto_migrate()
+        ExCodeRemote.Audit.attach()
         Logger.info("ExCodeRemote started on port #{port}")
 
       _ ->
@@ -44,5 +48,18 @@ defmodule ExCodeRemote.Application do
       _ ->
         raise "AUTH_TOKEN environment variable has an invalid value"
     end
+  end
+
+  defp auto_migrate do
+    path =
+      case :code.priv_dir(:ex_code_remote) do
+        {:error, _} -> Path.join([File.cwd!(), "priv", "audit", "migrations"])
+        priv_dir -> Path.join([to_string(priv_dir), "audit", "migrations"])
+      end
+
+    Ecto.Migrator.run(ExCodeRemote.Audit.Repo, path, :up, all: true, log: false)
+  rescue
+    e ->
+      Logger.error("Auto-migration failed: #{inspect(e)}. Audit system may be unavailable.")
   end
 end
