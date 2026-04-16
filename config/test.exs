@@ -8,4 +8,6 @@ config :ex_code_remote, ExCodeRemote.Audit.Repo,
   pool_size: 5,
   journal_mode: :wal
 
-config :logger, level: :warning
+# Keep logger at debug so CaptureLog can capture telemetry handler output.
+# Test noise is controlled by ExUnit's --trace/--quiet, not logger level.
+config :logger, level: :debug

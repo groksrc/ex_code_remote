@@ -3,6 +3,7 @@ defmodule ExCodeRemote.Router do
   use Plug.ErrorHandler
   import Ecto.Query
 
+  plug(ExCodeRemote.Plugs.RequestTiming)
   plug(:match)
   plug(Plug.Parsers, parsers: [:json], json_decoder: Jason)
   plug(:dispatch)

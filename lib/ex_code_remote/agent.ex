@@ -24,7 +24,12 @@ defmodule ExCodeRemote.Agent do
     # Stop existing connection if one exists (reconnect replacement)
     case Registry.lookup(@registry, machine) do
       [{pid, _}] ->
-        Logger.info("Replacing existing connection for machine #{machine}")
+        :telemetry.execute(
+          [:ex_code_remote, :agent, :replaced],
+          %{system_time: System.system_time()},
+          %{machine: machine, old_pid: pid}
+        )
+
         DynamicSupervisor.terminate_child(@supervisor, pid)
 
       [] ->

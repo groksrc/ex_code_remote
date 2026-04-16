@@ -40,7 +40,9 @@ defmodule ExCodeRemote.MixProject do
       {:websock_adapter, "~> 0.5"},
       {:telemetry, "~> 1.2"},
       {:ecto_sql, "~> 3.12"},
-      {:ecto_sqlite3, "~> 0.17"}
+      {:ecto_sqlite3, "~> 0.17"},
+      {:telemetry_metrics, "~> 1.0"},
+      {:logger_json, "~> 6.0"}
     ]
   end
 end

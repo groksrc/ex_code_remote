@@ -10,7 +10,7 @@ defmodule ExCodeRemote.Agent.Connection do
   # so in normal operation, the caller times out first.
   @server_timeout_slack_ms 10_000
 
-  defstruct [:machine, :socket_pid, :connected_at, pending: %{}]
+  defstruct [:machine, :socket_pid, :connected_at, :mono_connected_at, pending: %{}]
 
   def start_link({machine, socket_pid}) do
     GenServer.start_link(__MODULE__, {machine, socket_pid},
@@ -36,13 +36,19 @@ defmodule ExCodeRemote.Agent.Connection do
   def init({machine, socket_pid}) do
     Process.flag(:trap_exit, true)
     Process.monitor(socket_pid)
-    Logger.info("Agent connected: #{machine}")
+
+    :telemetry.execute(
+      [:ex_code_remote, :agent, :connected],
+      %{system_time: System.system_time()},
+      %{machine: machine}
+    )
 
     {:ok,
      %__MODULE__{
        machine: machine,
        socket_pid: socket_pid,
-       connected_at: DateTime.utc_now()
+       connected_at: DateTime.utc_now(),
+       mono_connected_at: :erlang.monotonic_time()
      }}
   end
 
@@ -78,7 +84,6 @@ defmodule ExCodeRemote.Agent.Connection do
             {:noreply, %{state | pending: new_pending}}
 
           {:error, :malformed} ->
-            # Discard malformed frame, leave pending entry for timeout guard
             Logger.debug("Malformed result frame for command #{id}, discarding")
 
             new_timer =
@@ -109,7 +114,6 @@ defmodule ExCodeRemote.Agent.Connection do
 
   @impl true
   def handle_info({:DOWN, _ref, :process, pid, _reason}, %{socket_pid: pid} = state) do
-    Logger.info("Agent disconnected (socket closed): #{state.machine}")
     {:stop, :normal, state}
   end
 
@@ -125,12 +129,38 @@ defmodule ExCodeRemote.Agent.Connection do
   end
 
   @impl true
-  def terminate(_reason, state) do
+  def terminate(reason, state) do
+    # Reply to all pending callers and cancel their timers
     for {_id, {from, timer_ref}} <- state.pending do
       Process.cancel_timer(timer_ref)
       GenServer.reply(from, {:error, :agent_disconnected})
     end
 
+    # Emit disconnected telemetry
+    duration =
+      if state.mono_connected_at,
+        do: :erlang.monotonic_time() - state.mono_connected_at,
+        else: 0
+
+    disconnect_reason =
+      case reason do
+        :normal -> :normal
+        :shutdown -> :shutdown
+        {:shutdown, _} -> :shutdown
+        _ -> :unknown
+      end
+
+    :telemetry.execute(
+      [:ex_code_remote, :agent, :disconnected],
+      %{duration: duration},
+      %{
+        machine: state.machine,
+        reason: disconnect_reason,
+        pending_count: map_size(state.pending)
+      }
+    )
+
+    # Best-effort: instruct socket to close with 1001 (going away)
     send(state.socket_pid, {:close, 1001, "going away"})
     :ok
   end

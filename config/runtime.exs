@@ -29,6 +29,8 @@ if auth_token = System.get_env("AUTH_TOKEN") do
 end
 
 if config_env() == :prod do
+  config :logger, :default_handler, formatter: {LoggerJSON.Formatters.Basic, []}
+
   database_path = System.get_env("DATABASE_PATH", "/data/audit.db")
 
   config :ex_code_remote, ExCodeRemote.Audit.Repo,

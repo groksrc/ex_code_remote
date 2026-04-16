@@ -23,6 +23,7 @@ defmodule ExCodeRemote.Application do
     case result do
       {:ok, _pid} ->
         auto_migrate()
+        ExCodeRemote.Telemetry.attach()
         ExCodeRemote.Audit.attach()
         Logger.info("ExCodeRemote started on port #{port}")
 
