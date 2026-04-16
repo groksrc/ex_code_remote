@@ -1,0 +1,33 @@
+# Elixir/Mix
+/_build/
+/deps/
+/cover/
+/doc/
+/.fetch
+erl_crash.dump
+*.ez
+*.beam
+
+# Generated on crash
+crash.log
+
+# Data
+*.db
+*.db-journal
+*.db-wal
+/priv/data/
+
+# Environment
+.env
+.env.*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
