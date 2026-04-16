@@ -3,6 +3,7 @@ defmodule ExCodeRemote.Commands.DispatcherTest do
 
   alias ExCodeRemote.Commands.{Dispatcher, Codec}
   alias ExCodeRemote.Test.FakeAgent
+  import ExCodeRemote.Test.Helpers
 
   @token "test-token-for-testing"
 
@@ -48,8 +49,7 @@ defmodule ExCodeRemote.Commands.DispatcherTest do
         )
 
       # Wait for connection
-      Process.sleep(200)
-      assert ExCodeRemote.Agent.connected?(machine)
+      await_connected(machine)
 
       result = Dispatcher.run(machine, %{type: :shell, command: "echo hello", timeout: 5})
       assert {:ok, %{status: "completed", output: "ok", exit_code: 0}} = result
@@ -64,7 +64,7 @@ defmodule ExCodeRemote.Commands.DispatcherTest do
           id: machine
         )
 
-      Process.sleep(200)
+      await_connected(machine)
 
       {time_us, {:ok, _}} =
         :timer.tc(fn ->
@@ -95,7 +95,7 @@ defmodule ExCodeRemote.Commands.DispatcherTest do
           id: machine
         )
 
-      Process.sleep(200)
+      await_connected(machine)
 
       {:ok, result} = Dispatcher.run(machine, %{type: :shell, command: "echo hi", timeout: 5})
 
@@ -118,7 +118,7 @@ defmodule ExCodeRemote.Commands.DispatcherTest do
           id: machine
         )
 
-      Process.sleep(200)
+      await_connected(machine)
 
       # Use a very short timeout
       result = Dispatcher.run(machine, %{type: :shell, command: "sleep 100", timeout: 1})
@@ -138,7 +138,7 @@ defmodule ExCodeRemote.Commands.DispatcherTest do
           id: machine
         )
 
-      Process.sleep(200)
+      await_connected(machine)
 
       # Start a dispatch in a task
       task =
@@ -203,7 +203,7 @@ defmodule ExCodeRemote.Commands.DispatcherTest do
           id: machine
         )
 
-      Process.sleep(200)
+      await_connected(machine)
       Dispatcher.run(machine, %{type: :shell, command: "echo hi", timeout: 5})
 
       assert_receive {:telemetry, [:ex_code_remote, :dispatcher, :command, :start],
@@ -235,7 +235,7 @@ defmodule ExCodeRemote.Commands.DispatcherTest do
           id: machine
         )
 
-      Process.sleep(200)
+      await_connected(machine)
       Dispatcher.run(machine, %{type: :shell, command: "slow", timeout: 1})
 
       assert_receive {:telemetry, [:ex_code_remote, :dispatcher, :command, :stop], _,
@@ -259,7 +259,7 @@ defmodule ExCodeRemote.Commands.DispatcherTest do
           id: machine
         )
 
-      Process.sleep(200)
+      await_connected(machine)
 
       # The malformed frame should not crash the connection — it should time out
       result = Dispatcher.run(machine, %{type: :shell, command: "echo hi", timeout: 1})
@@ -291,7 +291,7 @@ defmodule ExCodeRemote.Commands.DispatcherTest do
           id: machine
         )
 
-      Process.sleep(200)
+      await_connected(machine)
 
       # First dispatch gets a wrong-ID response, should timeout
       result1 = Dispatcher.run(machine, %{type: :shell, command: "first", timeout: 1})
@@ -311,7 +311,7 @@ defmodule ExCodeRemote.Commands.DispatcherTest do
           id: machine
         )
 
-      Process.sleep(200)
+      await_connected(machine)
 
       Dispatcher.run(machine, %{
         type: :shell,
@@ -347,7 +347,7 @@ defmodule ExCodeRemote.Commands.DispatcherTest do
           id: machine
         )
 
-      Process.sleep(200)
+      await_connected(machine)
 
       tasks =
         for i <- 1..5 do

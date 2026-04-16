@@ -2,6 +2,7 @@ defmodule ExCodeRemote.Agent.SocketTest do
   use ExUnit.Case, async: false
 
   alias ExCodeRemote.Test.WSClient
+  import ExCodeRemote.Test.Helpers
 
   @token "test-token-for-testing"
 
@@ -22,11 +23,10 @@ defmodule ExCodeRemote.Agent.SocketTest do
     machine = "ws-test-#{System.unique_integer([:positive])}"
     {:ok, state} = WSClient.connect(port, token: @token, machine: machine)
 
-    assert ExCodeRemote.Agent.connected?(machine)
+    await_connected(machine)
 
     {:ok, _state} = WSClient.send_close(state)
-    Process.sleep(200)
-    refute ExCodeRemote.Agent.connected?(machine)
+    await_disconnected(machine)
   end
 
   test "bad token returns 403", %{port: port} do
@@ -51,6 +51,7 @@ defmodule ExCodeRemote.Agent.SocketTest do
   test "ping/pong round-trip", %{port: port} do
     machine = "ping-test-#{System.unique_integer([:positive])}"
     {:ok, state} = WSClient.connect(port, token: @token, machine: machine)
+    await_connected(machine)
 
     {:ok, state} = WSClient.send_json(state, %{type: "ping"})
     {:ok, frame, _state} = WSClient.receive_frame(state)
@@ -61,9 +62,9 @@ defmodule ExCodeRemote.Agent.SocketTest do
   test "malformed JSON does not kill the connection", %{port: port} do
     machine = "malformed-test-#{System.unique_integer([:positive])}"
     {:ok, state} = WSClient.connect(port, token: @token, machine: machine)
+    await_connected(machine)
 
     {:ok, state} = WSClient.send_text(state, "this is not json{{{")
-    # Connection should still work
     {:ok, state} = WSClient.send_json(state, %{type: "ping"})
     {:ok, frame, _state} = WSClient.receive_frame(state)
 
@@ -73,6 +74,7 @@ defmodule ExCodeRemote.Agent.SocketTest do
   test "unknown frame type is silently ignored", %{port: port} do
     machine = "unknown-type-#{System.unique_integer([:positive])}"
     {:ok, state} = WSClient.connect(port, token: @token, machine: machine)
+    await_connected(machine)
 
     {:ok, state} = WSClient.send_json(state, %{type: "some_future_type", data: "whatever"})
     {:ok, state} = WSClient.send_json(state, %{type: "ping"})
@@ -84,6 +86,7 @@ defmodule ExCodeRemote.Agent.SocketTest do
   test "binary frame closes connection with 1003", %{port: port} do
     machine = "binary-test-#{System.unique_integer([:positive])}"
     {:ok, state} = WSClient.connect(port, token: @token, machine: machine)
+    await_connected(machine)
 
     {:ok, state} = WSClient.send_binary(state, <<1, 2, 3>>)
     {:close, 1003, _reason, _state} = WSClient.receive_frame(state)
@@ -93,13 +96,11 @@ defmodule ExCodeRemote.Agent.SocketTest do
     machine = "reconnect-test-#{System.unique_integer([:positive])}"
 
     {:ok, _state1} = WSClient.connect(port, token: @token, machine: machine)
-    assert ExCodeRemote.Agent.connected?(machine)
+    await_connected(machine)
 
-    # Second connection with same machine name
     {:ok, _state2} = WSClient.connect(port, token: @token, machine: machine)
-    Process.sleep(100)
+    await_connected(machine)
 
-    assert ExCodeRemote.Agent.connected?(machine)
     assert length(ExCodeRemote.Agent.list() |> Enum.filter(&(&1 == machine))) == 1
   end
 end

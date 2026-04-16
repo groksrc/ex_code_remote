@@ -4,6 +4,7 @@ defmodule ExCodeRemote.TelemetryTest do
   import ExUnit.CaptureLog
 
   alias ExCodeRemote.Test.FakeAgent
+  import ExCodeRemote.Test.Helpers
 
   setup do
     test_pid = self()
@@ -50,7 +51,7 @@ defmodule ExCodeRemote.TelemetryTest do
       {:ok, _} =
         start_supervised({FakeAgent, port: port, machine: machine, owner: self()}, id: machine)
 
-      Process.sleep(200)
+      await_connected(machine)
 
       ExCodeRemote.Commands.Dispatcher.run(machine, %{
         type: :shell,
@@ -93,7 +94,7 @@ defmodule ExCodeRemote.TelemetryTest do
       {:ok, agent} =
         start_supervised({FakeAgent, port: port, machine: machine, owner: self()}, id: machine)
 
-      Process.sleep(200)
+      await_connected(machine)
 
       # Drain the :connected event
       assert_receive {:telemetry_event, [:ex_code_remote, :agent, :connected], _, _}, 1000
@@ -118,7 +119,7 @@ defmodule ExCodeRemote.TelemetryTest do
           id: :"#{machine}-1"
         )
 
-      Process.sleep(200)
+      await_connected(machine)
 
       # Drain the first :connected
       assert_receive {:telemetry_event, [:ex_code_remote, :agent, :connected], _, _}, 1000
@@ -129,7 +130,7 @@ defmodule ExCodeRemote.TelemetryTest do
           id: :"#{machine}-2"
         )
 
-      Process.sleep(200)
+      await_connected(machine)
 
       assert_receive {:telemetry_event, [:ex_code_remote, :agent, :replaced], %{system_time: _},
                       %{machine: ^machine, old_pid: old_pid}},

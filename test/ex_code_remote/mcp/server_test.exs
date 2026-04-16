@@ -18,12 +18,14 @@ defmodule ExCodeRemote.MCP.ServerTest do
     {:ok, port: port}
   end
 
+  import ExCodeRemote.Test.Helpers
+
   defp start_agent(port, machine, handler \\ nil) do
     opts = [port: port, machine: machine, owner: self()]
     opts = if handler, do: Keyword.put(opts, :handler, handler), else: opts
 
     {:ok, _pid} = start_supervised({FakeAgent, opts}, id: machine)
-    Process.sleep(200)
+    await_connected(machine)
   end
 
   describe "check_agent_status" do
