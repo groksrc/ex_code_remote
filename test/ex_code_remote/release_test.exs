@@ -11,7 +11,10 @@ defmodule ExCodeRemote.ReleaseTest do
 
       # Verify the migration actually produced the expected schema
       {:ok, result} =
-        Ecto.Adapters.SQL.query(ExCodeRemote.Audit.Repo, "SELECT name FROM sqlite_master WHERE type='table' AND name='commands'")
+        Ecto.Adapters.SQL.query(
+          ExCodeRemote.Audit.Repo,
+          "SELECT name FROM sqlite_master WHERE type='table' AND name='commands'"
+        )
 
       assert [["commands"]] == result.rows
     end

@@ -2,7 +2,9 @@ defmodule ExCodeRemote.Agent.SocketTest do
   use ExUnit.Case, async: false
 
   alias ExCodeRemote.Test.WSClient
-  import ExCodeRemote.Test.Helpers, only: [await_connected: 1, await_connected: 2, await_disconnected: 1, await_disconnected: 2]
+
+  import ExCodeRemote.Test.Helpers,
+    only: [await_connected: 1, await_connected: 2, await_disconnected: 1, await_disconnected: 2]
 
   @token "test-token-for-testing"
 

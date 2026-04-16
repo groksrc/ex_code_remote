@@ -4,7 +4,9 @@ defmodule ExCodeRemote.TelemetryTest do
   import ExUnit.CaptureLog
 
   alias ExCodeRemote.Test.FakeAgent
-  import ExCodeRemote.Test.Helpers, only: [await_connected: 1, await_connected: 2, await_disconnected: 1, await_disconnected: 2]
+
+  import ExCodeRemote.Test.Helpers,
+    only: [await_connected: 1, await_connected: 2, await_disconnected: 1, await_disconnected: 2]
 
   setup do
     test_pid = self()

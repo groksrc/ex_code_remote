@@ -98,10 +98,11 @@ defmodule ExCodeRemote.Plugs.PrivateNetworkTest do
   describe "fly-client-ip header" do
     test "used when present" do
       with_enforcement(true, fn ->
-        conn = build_conn(
-          remote_ip: {8, 8, 8, 8},
-          headers: [{"fly-client-ip", "100.64.1.1"}]
-        )
+        conn =
+          build_conn(
+            remote_ip: {8, 8, 8, 8},
+            headers: [{"fly-client-ip", "100.64.1.1"}]
+          )
 
         result = PrivateNetwork.call(conn, [])
         refute result.halted
@@ -110,13 +111,14 @@ defmodule ExCodeRemote.Plugs.PrivateNetworkTest do
 
     test "x-forwarded-for ignored when fly-client-ip is present" do
       with_enforcement(true, fn ->
-        conn = build_conn(
-          remote_ip: {8, 8, 8, 8},
-          headers: [
-            {"fly-client-ip", "100.64.1.1"},
-            {"x-forwarded-for", "8.8.8.8"}
-          ]
-        )
+        conn =
+          build_conn(
+            remote_ip: {8, 8, 8, 8},
+            headers: [
+              {"fly-client-ip", "100.64.1.1"},
+              {"x-forwarded-for", "8.8.8.8"}
+            ]
+          )
 
         result = PrivateNetwork.call(conn, [])
         refute result.halted
@@ -125,10 +127,11 @@ defmodule ExCodeRemote.Plugs.PrivateNetworkTest do
 
     test "malformed fly-client-ip denies (fail closed)" do
       with_enforcement(true, fn ->
-        conn = build_conn(
-          remote_ip: {100, 64, 0, 1},
-          headers: [{"fly-client-ip", "not-an-ip"}]
-        )
+        conn =
+          build_conn(
+            remote_ip: {100, 64, 0, 1},
+            headers: [{"fly-client-ip", "not-an-ip"}]
+          )
 
         result = PrivateNetwork.call(conn, [])
         assert result.halted
@@ -140,10 +143,11 @@ defmodule ExCodeRemote.Plugs.PrivateNetworkTest do
   describe "x-forwarded-for parsing" do
     test "single IP used" do
       with_enforcement(true, fn ->
-        conn = build_conn(
-          remote_ip: {8, 8, 8, 8},
-          headers: [{"x-forwarded-for", "100.64.1.1"}]
-        )
+        conn =
+          build_conn(
+            remote_ip: {8, 8, 8, 8},
+            headers: [{"x-forwarded-for", "100.64.1.1"}]
+          )
 
         result = PrivateNetwork.call(conn, [])
         refute result.halted
@@ -153,10 +157,11 @@ defmodule ExCodeRemote.Plugs.PrivateNetworkTest do
     test "rightmost IP used with multiple IPs" do
       with_enforcement(true, fn ->
         # Leftmost is Tailscale (spoofed), rightmost is public (real)
-        conn = build_conn(
-          remote_ip: {8, 8, 8, 8},
-          headers: [{"x-forwarded-for", "100.64.1.1, 203.0.113.50"}]
-        )
+        conn =
+          build_conn(
+            remote_ip: {8, 8, 8, 8},
+            headers: [{"x-forwarded-for", "100.64.1.1, 203.0.113.50"}]
+          )
 
         result = PrivateNetwork.call(conn, [])
         assert result.halted
@@ -166,10 +171,11 @@ defmodule ExCodeRemote.Plugs.PrivateNetworkTest do
 
     test "spoofed Tailscale IP in leftmost position denied" do
       with_enforcement(true, fn ->
-        conn = build_conn(
-          remote_ip: {8, 8, 8, 8},
-          headers: [{"x-forwarded-for", "100.64.0.1, 100.100.1.1, 203.0.113.50"}]
-        )
+        conn =
+          build_conn(
+            remote_ip: {8, 8, 8, 8},
+            headers: [{"x-forwarded-for", "100.64.0.1, 100.100.1.1, 203.0.113.50"}]
+          )
 
         result = PrivateNetwork.call(conn, [])
         assert result.halted
@@ -179,10 +185,11 @@ defmodule ExCodeRemote.Plugs.PrivateNetworkTest do
 
     test "rightmost Tailscale IP allowed" do
       with_enforcement(true, fn ->
-        conn = build_conn(
-          remote_ip: {8, 8, 8, 8},
-          headers: [{"x-forwarded-for", "203.0.113.50, 100.64.1.1"}]
-        )
+        conn =
+          build_conn(
+            remote_ip: {8, 8, 8, 8},
+            headers: [{"x-forwarded-for", "203.0.113.50, 100.64.1.1"}]
+          )
 
         result = PrivateNetwork.call(conn, [])
         refute result.halted
@@ -191,10 +198,11 @@ defmodule ExCodeRemote.Plugs.PrivateNetworkTest do
 
     test "whitespace trimmed around IPs" do
       with_enforcement(true, fn ->
-        conn = build_conn(
-          remote_ip: {8, 8, 8, 8},
-          headers: [{"x-forwarded-for", "  203.0.113.50 ,  100.64.1.1  "}]
-        )
+        conn =
+          build_conn(
+            remote_ip: {8, 8, 8, 8},
+            headers: [{"x-forwarded-for", "  203.0.113.50 ,  100.64.1.1  "}]
+          )
 
         result = PrivateNetwork.call(conn, [])
         refute result.halted
@@ -203,10 +211,11 @@ defmodule ExCodeRemote.Plugs.PrivateNetworkTest do
 
     test "malformed x-forwarded-for denies (fail closed)" do
       with_enforcement(true, fn ->
-        conn = build_conn(
-          remote_ip: {100, 64, 0, 1},
-          headers: [{"x-forwarded-for", "not-an-ip"}]
-        )
+        conn =
+          build_conn(
+            remote_ip: {100, 64, 0, 1},
+            headers: [{"x-forwarded-for", "not-an-ip"}]
+          )
 
         result = PrivateNetwork.call(conn, [])
         assert result.halted
@@ -216,10 +225,11 @@ defmodule ExCodeRemote.Plugs.PrivateNetworkTest do
 
     test "empty x-forwarded-for falls back to conn.remote_ip" do
       with_enforcement(true, fn ->
-        conn = build_conn(
-          remote_ip: {100, 64, 0, 1},
-          headers: [{"x-forwarded-for", ""}]
-        )
+        conn =
+          build_conn(
+            remote_ip: {100, 64, 0, 1},
+            headers: [{"x-forwarded-for", ""}]
+          )
 
         result = PrivateNetwork.call(conn, [])
         refute result.halted

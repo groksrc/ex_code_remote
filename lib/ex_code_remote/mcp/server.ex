@@ -19,12 +19,34 @@ defmodule ExCodeRemote.MCP.Server do
   alias ExCodeRemote.Agent
   alias ExCodeRemote.MCP.ResultFormatter
 
-  # ExMCP's HttpPlug MessageProcessor sends {:handle_initialize, params}
-  # but the Handler GenServer macro defines handle_call for {:initialize, params}.
-  # Bridge the mismatch so HttpPlug can drive this handler.
-  @impl GenServer
-  def handle_call({:handle_initialize, params}, from, state) do
-    handle_call({:initialize, params}, from, state)
+  # ExMCP 0.9.1 has two bugs in the initialize path:
+  #   1. MessageProcessor.MethodHandlers.handle_initialize/6 sends
+  #      {:handle_initialize, params}, but Server.Handler.__using__ only
+  #      handles {:initialize, params}.
+  #   2. Even if you reach the macro's clause, it replies {:ok, result}
+  #      (2-tuple), but MessageProcessor expects {:ok, result, _state}
+  #      (3-tuple), causing a CaseClauseError.
+  # Override handle_call/3 to dispatch handle_initialize/2 ourselves with the
+  # tuple shape MessageProcessor expects. We can't use plain `def` to add a
+  # clause because `use GenServer` (inside ExMCP.Server.Handler) calls
+  # `defoverridable handle_call: 3`, so the macro's first def after that
+  # replaces prior clauses, and a clause after `use` is shadowed by the
+  # macro's catch-all. Re-defoverridable + super gives us the override.
+  defoverridable handle_call: 3
+
+  def handle_call({:handle_initialize, params}, _from, state) do
+    {:ok, result, new_state} = handle_initialize(params, state)
+    {:reply, {:ok, result, new_state}, new_state}
+  end
+
+  def handle_call(msg, from, state), do: super(msg, from, state)
+
+  # Supervisor entry point. The supervised instance is mostly a no-op at
+  # runtime (ExMCP.MessageProcessor spawns its own per-request handler via
+  # GenServer.start_link/2 without :name), but starting it on boot ensures
+  # the module is loaded so detect_server_type/1 picks the :handler path.
+  def start_link(opts) do
+    GenServer.start_link(__MODULE__, opts, name: __MODULE__)
   end
 
   @default_timeout 60
