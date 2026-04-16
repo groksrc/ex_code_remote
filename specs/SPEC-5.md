@@ -11,7 +11,7 @@ tags:
 
 # SPEC-5: MCP Tool Surface
 
-Status: Spec-Reviewed
+Status: Implemented
 
 ## Why
 

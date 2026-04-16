@@ -42,6 +42,18 @@ defmodule ExCodeRemote.Router do
     end
   end
 
+  # MCP transport — ExMCP's HttpPlug handles /sse, POST (messages), and related paths.
+  # Mounted at /mcp so it doesn't shadow /health, /ws/agent, or the catch-all 404.
+  # MCP endpoint URL for Claude.ai connectors: https://<host>/mcp/sse
+  forward("/mcp",
+    to: ExMCP.HttpPlug,
+    init_opts: [
+      handler: ExCodeRemote.MCP.Server,
+      server_info: %{name: "code-remote", version: "0.1.0"},
+      sse_enabled: true
+    ]
+  )
+
   match _ do
     body = Jason.encode!(%{error: "not found"})
 
