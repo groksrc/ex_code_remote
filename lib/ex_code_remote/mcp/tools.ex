@@ -58,7 +58,7 @@ defmodule ExCodeRemote.MCP.Tools do
     %{
       "name" => "run_shell_command",
       "description" =>
-        "Execute a shell command on a remote machine and wait synchronously for the result. Use this for commands you expect to finish in under ~30 seconds. For longer commands (builds, test suites, migrations) use `start_command` instead — synchronous calls are capped at 50 seconds by the proxy and will fail past that.",
+        "Execute a shell command on a remote machine and wait synchronously for the result. Use this for commands you expect to finish in under ~30 seconds. For longer commands (builds, test suites, migrations) use `start_command` instead — synchronous calls are capped at 50 seconds server-side and will fail past that.",
       "inputSchema" => %{
         "type" => "object",
         "properties" => %{
@@ -82,7 +82,8 @@ defmodule ExCodeRemote.MCP.Tools do
     },
     %{
       "name" => "read_file",
-      "description" => "Read the contents of a file on a remote machine.",
+      "description" =>
+        "Read the contents of a file on a remote machine. Returns the text content; binaries are decoded with replacement characters. Output is truncated at ~1MB with a `... (content truncated)` marker.",
       "inputSchema" => %{
         "type" => "object",
         "properties" => %{
@@ -98,7 +99,7 @@ defmodule ExCodeRemote.MCP.Tools do
     %{
       "name" => "write_file",
       "description" =>
-        "Write content to a file on a remote machine. Creates parent directories if needed.",
+        "Write content to a file on a remote machine. Overwrites the file if it already exists; does not append. Creates parent directories if needed.",
       "inputSchema" => %{
         "type" => "object",
         "properties" => %{
@@ -114,7 +115,8 @@ defmodule ExCodeRemote.MCP.Tools do
     },
     %{
       "name" => "list_directory",
-      "description" => "List contents of a directory on a remote machine.",
+      "description" =>
+        "List contents of a directory on a remote machine. Returns one entry per line, sorted, in tab-separated `<type>\\t<size>\\t<name>` format where type is `dir` or `file` and size is bytes (0 for directories).",
       "inputSchema" => %{
         "type" => "object",
         "properties" => %{
@@ -135,7 +137,7 @@ defmodule ExCodeRemote.MCP.Tools do
     %{
       "name" => "start_command",
       "description" =>
-        "Start a shell command on a remote machine asynchronously and return a command_id immediately. Use this for commands expected to take more than ~30 seconds (builds, test suites, migrations), or when you want to end the conversation turn before the result is back. Look up the result later with `get_command_result` (by id) or browse recent commands with `list_commands`.",
+        "Start a shell command on a remote machine asynchronously and return a command_id immediately. Use this for commands expected to take more than ~30 seconds (builds, test suites, migrations), or when you want to return a response without waiting for the command to finish. Look up the result later with `get_command_result` (by id) or browse recent commands with `list_commands`. The command keeps running on the agent regardless of whether anyone is waiting.",
       "inputSchema" => %{
         "type" => "object",
         "properties" => %{
