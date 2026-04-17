@@ -6,24 +6,100 @@ A Python agent runs on each remote machine and connects via WebSocket. AI client
 
 ## Architecture
 
-```
-Claude.ai / Claude Code
-        |
-        | MCP (JSON-RPC over HTTPS)
-        v
-  +-----------------+
-  |  ex_code_remote |  Fly.io (dfw)
-  |  (Elixir/OTP)   |
-  +-----------------+
-        |
-        | WebSocket (over Tailscale)
-        v
-  +-------------+
-  | Python agent |  Remote machine(s)
-  +-------------+
+```mermaid
+graph TB
+    subgraph clients["AI Clients"]
+        claude["Claude.ai"]
+        code["Claude Code"]
+    end
+
+    subgraph fly["Fly.io"]
+        subgraph server["ex_code_remote (Elixir/OTP)"]
+            router["Router"]
+            oauth["OAuth 2.1"]
+            mcp["MCP Plug<br/>(JSON-RPC)"]
+            dispatcher["Dispatcher"]
+            registry["Agent Registry"]
+            conn["Connection<br/>GenServer"]
+            audit["Audit Log<br/>(SQLite)"]
+            telemetry["Telemetry"]
+        end
+        tailscale["Tailscale"]
+    end
+
+    subgraph machines["Remote Machines"]
+        agent1["Python Agent"]
+        agent2["Python Agent"]
+    end
+
+    claude -- "HTTPS + OAuth" --> router
+    code -- "HTTPS + OAuth" --> router
+    router --> oauth
+    router --> mcp
+    mcp --> dispatcher
+    dispatcher --> registry
+    registry --> conn
+    dispatcher --> audit
+    conn -- "WebSocket" --> tailscale
+    tailscale -- "WireGuard" --> agent1
+    tailscale -- "WireGuard" --> agent2
+    conn --> telemetry
+    dispatcher --> telemetry
+    telemetry --> audit
 ```
 
-**Key design decisions:**
+### Synchronous command flow
+
+```mermaid
+sequenceDiagram
+    participant C as Claude.ai
+    participant M as MCP Plug
+    participant D as Dispatcher
+    participant G as Connection GenServer
+    participant A as Python Agent
+
+    C->>M: POST /mcp (tools/call: run_shell_command)
+    M->>D: Dispatcher.run(machine, command)
+    D->>G: GenServer.call (deferred reply)
+    G->>A: WebSocket frame {type: execute, id: cmd_id}
+    A->>A: Execute command
+    A->>G: WebSocket frame {type: result, id: cmd_id}
+    G->>D: GenServer.reply(result)
+    D->>M: {:ok, result}
+    M->>C: JSON-RPC response
+```
+
+### Async command flow
+
+```mermaid
+sequenceDiagram
+    participant C as Claude.ai
+    participant M as MCP Plug
+    participant D as Dispatcher
+    participant G as Connection GenServer
+    participant DB as Audit DB
+    participant A as Python Agent
+
+    C->>M: tools/call: start_command
+    M->>D: Dispatcher.run_async(machine, command)
+    D->>DB: Insert audit row (status: running)
+    D->>G: send frame (fire-and-forget)
+    G->>A: WebSocket frame {type: execute}
+    D->>M: {:ok, command_id}
+    M->>C: command_id + status: running
+
+    Note over A: Command runs...
+
+    A->>G: WebSocket frame {type: result}
+    G->>DB: Update audit row (status: completed)
+
+    C->>M: tools/call: get_command_result
+    M->>DB: Query by command_id
+    DB->>M: Completed result
+    M->>C: Output + exit code
+```
+
+### Key design decisions
 
 - **One GenServer per agent connection** -- crash isolation, no shared mutable state between agents
 - **In-memory command correlation** -- deferred `GenServer.reply` replaces the Python server's SQLite polling loop
