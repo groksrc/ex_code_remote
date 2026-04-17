@@ -78,15 +78,19 @@ mix test
 ### First deploy
 
 ```sh
+# Copy and customize the Fly config
+cp fly.toml.example fly.toml
+# Edit fly.toml: set your app name and preferred region
+
 # Create app and volume
-fly apps create ex-code-remote
-fly volumes create ex_code_remote_data --region dfw --size 1 -a ex-code-remote --yes
+fly apps create your-app-name
+fly volumes create ex_code_remote_data --region YOUR_REGION --size 1 -a your-app-name --yes
 
 # Set secrets
-fly secrets set AUTH_TOKEN=$(openssl rand -hex 32) -a ex-code-remote
-fly secrets set TAILSCALE_AUTHKEY=tskey-auth-... -a ex-code-remote
-fly secrets set MCP_CLIENT_ID=your-client-id -a ex-code-remote
-fly secrets set MCP_CLIENT_SECRET=$(openssl rand -hex 32) -a ex-code-remote
+fly secrets set AUTH_TOKEN=$(openssl rand -hex 32) -a your-app-name
+fly secrets set TAILSCALE_AUTHKEY=tskey-auth-... -a your-app-name
+fly secrets set MCP_CLIENT_ID=your-client-id -a your-app-name
+fly secrets set MCP_CLIENT_SECRET=$(openssl rand -hex 32) -a your-app-name
 
 # Deploy
 fly deploy
@@ -118,7 +122,7 @@ Use `ws://` (not `wss://`) -- Tailscale provides WireGuard encryption at the tra
 
 Add a custom MCP connector in Claude.ai settings:
 
-- **URL**: `https://ex-code-remote.fly.dev/mcp`
+- **URL**: `https://your-app-name.fly.dev/mcp`
 - **OAuth Client ID**: value of `MCP_CLIENT_ID`
 - **OAuth Client Secret**: value of `MCP_CLIENT_SECRET`
 

@@ -1,0 +1,38 @@
+# Copy this file to fly.toml and customize before deploying.
+#
+#   cp fly.toml.example fly.toml
+#   fly apps create your-app-name
+#   fly volumes create ex_code_remote_data --region YOUR_REGION --size 1 -a your-app-name --yes
+#   fly deploy
+
+app = "your-app-name"
+primary_region = "dfw"  # Change to your preferred region
+kill_signal = "SIGTERM"
+kill_timeout = "30s"
+
+[build]
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  # CRITICAL: agents hold long-lived WebSocket connections. Fly's default
+  # auto-stop would sever every agent when the machine looks idle over HTTP.
+  auto_stop_machines = false
+  auto_start_machines = true
+  min_machines_running = 1
+
+# NOTE: Fly's HTTP proxy enforces a ~60s per-request cap that cannot be
+# raised via fly.toml. The synchronous shell timeout is capped at 50s
+# server-side to stay within this window. Commands that need longer
+# should use the async tool path (start_command / get_command_result).
+
+[[http_service.checks]]
+  interval = "15s"
+  timeout = "5s"
+  grace_period = "30s"
+  method = "GET"
+  path = "/health"
+
+[mounts]
+  source = "ex_code_remote_data"
+  destination = "/data"

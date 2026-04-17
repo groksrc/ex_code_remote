@@ -18,6 +18,9 @@ crash.log
 *.db-shm
 /priv/data/
 
+# Deployment
+fly.toml
+
 # Environment
 .env
 .env.*
