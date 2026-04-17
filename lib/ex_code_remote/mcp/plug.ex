@@ -43,7 +43,12 @@ defmodule ExCodeRemote.MCP.Plug do
   def init(opts), do: opts
 
   @impl true
-  def call(%Plug.Conn{method: "POST"} = conn, _opts), do: handle_post(conn)
+  def call(%Plug.Conn{method: "POST"} = conn, _opts) do
+    case check_auth(conn) do
+      :ok -> handle_post(conn)
+      {:error, conn} -> conn
+    end
+  end
 
   def call(%Plug.Conn{method: "OPTIONS"} = conn, _opts) do
     conn |> put_cors_headers() |> send_resp(204, "")
@@ -206,5 +211,26 @@ defmodule ExCodeRemote.MCP.Plug do
 
   defp version do
     Application.spec(:ex_code_remote, :vsn) |> to_string()
+  end
+
+  # --- Auth ---
+
+  # When OAuth is configured, require a valid Bearer token on every POST.
+  # When not configured (dev/test), skip auth entirely.
+  defp check_auth(conn) do
+    if ExCodeRemote.OAuth.enabled?() do
+      case get_req_header(conn, "authorization") do
+        ["Bearer " <> token] ->
+          case ExCodeRemote.OAuth.verify_bearer_token(token) do
+            :ok -> :ok
+            :error -> {:error, send_resp(conn, 401, Jason.encode!(%{error: "invalid_token"}))}
+          end
+
+        _ ->
+          {:error, send_resp(conn, 401, Jason.encode!(%{error: "missing_token"}))}
+      end
+    else
+      :ok
+    end
   end
 end

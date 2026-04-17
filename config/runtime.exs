@@ -29,6 +29,14 @@ if config_env() != :prod do
   if auth_token = System.get_env("AUTH_TOKEN") do
     config :ex_code_remote, auth_token: auth_token
   end
+
+  if mcp_client_id = System.get_env("MCP_CLIENT_ID") do
+    config :ex_code_remote, mcp_client_id: mcp_client_id
+  end
+
+  if mcp_client_secret = System.get_env("MCP_CLIENT_SECRET") do
+    config :ex_code_remote, mcp_client_secret: mcp_client_secret
+  end
 end
 
 if config_env() == :prod do
@@ -42,6 +50,15 @@ if config_env() == :prod do
   end
 
   config :ex_code_remote, auth_token: auth_token
+
+  # MCP OAuth credentials (optional — if set, MCP endpoint requires auth)
+  if mcp_client_id = System.get_env("MCP_CLIENT_ID") do
+    config :ex_code_remote, mcp_client_id: mcp_client_id
+  end
+
+  if mcp_client_secret = System.get_env("MCP_CLIENT_SECRET") do
+    config :ex_code_remote, mcp_client_secret: mcp_client_secret
+  end
 
   require_private_network =
     System.get_env("REQUIRE_PRIVATE_NETWORK", "true")

@@ -8,10 +8,12 @@ defmodule ExCodeRemote.Router do
   plug(:maybe_parse_body)
   plug(:dispatch)
 
-  # Skip Plug.Parsers for /mcp routes — the MCP plug reads and decodes the
-  # body itself. Plug.Parsers consumes the request body, leaving nothing
-  # for the downstream plug to read.
+  # Skip Plug.Parsers for /mcp and /oauth routes — those plugs read and
+  # decode the body themselves. Plug.Parsers consumes the request body,
+  # leaving nothing for the downstream plug to read.
   defp maybe_parse_body(%{path_info: ["mcp" | _]} = conn, _opts), do: conn
+  defp maybe_parse_body(%{path_info: ["oauth" | _]} = conn, _opts), do: conn
+  defp maybe_parse_body(%{path_info: [".well-known" | _]} = conn, _opts), do: conn
 
   defp maybe_parse_body(conn, _opts) do
     Plug.Parsers.call(conn, Plug.Parsers.init(parsers: [:json], json_decoder: Jason))
@@ -61,6 +63,20 @@ defmodule ExCodeRemote.Router do
 
   get "/commands" do
     handle_commands(conn)
+  end
+
+  # --- OAuth 2.1 endpoints for MCP authentication ---
+
+  get "/.well-known/oauth-authorization-server" do
+    ExCodeRemote.OAuth.handle_discovery(conn)
+  end
+
+  get "/oauth/authorize" do
+    ExCodeRemote.OAuth.handle_authorize(conn)
+  end
+
+  post "/oauth/token" do
+    ExCodeRemote.OAuth.handle_token(conn)
   end
 
   # MCP transport — our own JSON-RPC over HTTP plug. Replaces ExMCP.HttpPlug
