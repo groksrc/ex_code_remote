@@ -50,6 +50,7 @@ defmodule ExCodeRemote.MCP.Tools do
   @status_column_width 18
 
   @valid_statuses ~w(running completed failed timeout agent_disconnected)
+  @terminal_statuses ~w(completed failed timeout agent_disconnected)
 
   @machine_description "Target machine name (e.g. 'my-laptop', 'office-mac')"
 
@@ -193,7 +194,7 @@ defmodule ExCodeRemote.MCP.Tools do
           },
           "status" => %{
             "type" => "string",
-            "enum" => ["running", "completed", "failed", "timeout", "agent_disconnected"],
+            "enum" => @valid_statuses,
             "description" => "Filter to commands in this terminal/running state."
           },
           "limit" => %{
@@ -402,7 +403,7 @@ defmodule ExCodeRemote.MCP.Tools do
     # the publisher side means a row that's now terminal is authoritative).
     case safe_get_command(command_id) do
       {:ok, %{status: status} = row}
-      when status in ~w(completed failed timeout agent_disconnected) ->
+      when status in @terminal_statuses ->
         render_terminal(row)
 
       _ ->
@@ -439,7 +440,7 @@ defmodule ExCodeRemote.MCP.Tools do
     "No command found with id '#{command_id}'. Use list_commands to find recent commands."
   end
 
-  defp terminal?(status), do: status in ~w(completed failed timeout agent_disconnected)
+  defp terminal?(status), do: status in @terminal_statuses
 
   # --- Header block rendering ---
 

@@ -46,7 +46,7 @@ defmodule ExCodeRemote.Commands.StartupSweeper do
 
   alias ExCodeRemote.Audit.{Queries, Repo}
 
-  @doc false
+  @spec start_link(term()) :: GenServer.on_start()
   def start_link(opts) do
     GenServer.start_link(__MODULE__, opts, name: __MODULE__)
   end
@@ -60,12 +60,20 @@ defmodule ExCodeRemote.Commands.StartupSweeper do
   @doc """
   Performs the sweep. Exposed for testing; the supervisor calls this
   exactly once at boot via `init/1`.
+
+  Returns `{:ok, count}` where `count` is the number of rows reconciled.
+  Returns `{:error, :repo_not_running}` if the audit `Repo` is not
+  registered, or `{:error, exception}` if an exception is raised during
+  the sweep. Idempotent — safe to call multiple times.
   """
+  @spec sweep() ::
+          {:ok, non_neg_integer()}
+          | {:error, :repo_not_running | Exception.t()}
   def sweep do
     case Process.whereis(Repo) do
       nil ->
         Logger.error("startup_sweep_skipped: audit Repo not running")
-        :ok
+        {:error, :repo_not_running}
 
       _pid ->
         do_sweep()
@@ -73,7 +81,7 @@ defmodule ExCodeRemote.Commands.StartupSweeper do
   rescue
     e ->
       Logger.error("startup_sweep_failed: #{Exception.message(e)}")
-      :ok
+      {:error, e}
   end
 
   defp do_sweep do
@@ -122,7 +130,7 @@ defmodule ExCodeRemote.Commands.StartupSweeper do
       })
     end)
 
-    :ok
+    {:ok, count}
   end
 
   # No-op handlers; the GenServer is idle after init/1.

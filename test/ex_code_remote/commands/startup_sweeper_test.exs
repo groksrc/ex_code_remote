@@ -49,7 +49,7 @@ defmodule ExCodeRemote.Commands.StartupSweeperTest do
       insert_running("r-2", DateTime.add(DateTime.utc_now(), -90, :second))
       insert_running("r-3", DateTime.add(DateTime.utc_now(), -5, :second))
 
-      assert :ok = StartupSweeper.sweep()
+      assert {:ok, 3} = StartupSweeper.sweep()
 
       for id <- ["r-1", "r-2", "r-3"] do
         row = Repo.get(Command, id)
@@ -66,7 +66,7 @@ defmodule ExCodeRemote.Commands.StartupSweeperTest do
       insert_terminal("was-timeout", "timeout")
       insert_terminal("was-agent-disconnected", "agent_disconnected")
 
-      assert :ok = StartupSweeper.sweep()
+      assert {:ok, 1} = StartupSweeper.sweep()
 
       assert Repo.get(Command, "will-be-swept").status == "agent_disconnected"
       assert Repo.get(Command, "was-completed").status == "completed"
@@ -78,7 +78,7 @@ defmodule ExCodeRemote.Commands.StartupSweeperTest do
     test "is idempotent — running twice produces the same terminal state" do
       insert_running("idempotent-1", DateTime.add(DateTime.utc_now(), -30, :second))
 
-      assert :ok = StartupSweeper.sweep()
+      assert {:ok, 1} = StartupSweeper.sweep()
       row1 = Repo.get(Command, "idempotent-1")
       assert row1.status == "agent_disconnected"
       completed_at_1 = row1.completed_at
@@ -86,7 +86,7 @@ defmodule ExCodeRemote.Commands.StartupSweeperTest do
       # Sleep so any re-write would have a detectably different
       # completed_at, and assert the row is NOT touched.
       Process.sleep(50)
-      assert :ok = StartupSweeper.sweep()
+      assert {:ok, 0} = StartupSweeper.sweep()
 
       row2 = Repo.get(Command, "idempotent-1")
       assert row2.status == "agent_disconnected"
@@ -95,7 +95,7 @@ defmodule ExCodeRemote.Commands.StartupSweeperTest do
 
     test "empty table is a no-op" do
       assert Repo.all(Command) == []
-      assert :ok = StartupSweeper.sweep()
+      assert {:ok, 0} = StartupSweeper.sweep()
       assert Repo.all(Command) == []
     end
   end
