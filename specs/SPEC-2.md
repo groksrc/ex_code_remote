@@ -7,11 +7,10 @@ tags:
 - plug
 - bandit
 - health
+status: implemented
 ---
 
 # SPEC-2: HTTP Skeleton
-
-Status: Implemented
 
 ## Why
 

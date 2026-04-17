@@ -8,11 +8,10 @@ tags:
 - docker
 - release
 - cutover
+status: implemented
 ---
 
 # SPEC-8: Deployment
-
-Status: Implemented
 
 ## Why
 

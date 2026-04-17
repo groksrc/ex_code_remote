@@ -7,11 +7,10 @@ tags:
 - tailscale
 - network
 - plug
+status: implemented
 ---
 
 # SPEC-9: Tailscale Private Network Enforcement
-
-Status: Spec-Reviewed
 
 ## Why
 

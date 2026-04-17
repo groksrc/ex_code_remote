@@ -8,11 +8,10 @@ tags:
 - supervision
 - registry
 - protocol
+status: implemented
 ---
 
 # SPEC-3: Agent WebSocket and Connection Lifecycle
-
-Status: Implemented
 
 ## Why
 

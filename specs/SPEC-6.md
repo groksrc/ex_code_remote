@@ -7,11 +7,10 @@ tags:
 - persistence
 - ecto
 - sqlite
+status: implemented
 ---
 
 # SPEC-6: Audit Log
-
-Status: Implemented
 
 ## Why
 

@@ -7,11 +7,10 @@ tags:
 - tools
 - ex_mcp
 - claude
+status: implemented
 ---
 
 # SPEC-5: MCP Tool Surface
-
-Status: Implemented
 
 ## Why
 

@@ -7,6 +7,7 @@ tags:
 - telemetry
 - logging
 - metrics
+status: implemented
 ---
 
 # SPEC-7: Observability

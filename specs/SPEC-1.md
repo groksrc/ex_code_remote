@@ -6,11 +6,10 @@ tags:
 - meta
 - initialization
 - architecture
+status: implemented
 ---
 
 # SPEC-1: Project Definition and Initialization
-
-Status: Implemented
 
 ## Why
 

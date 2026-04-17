@@ -7,11 +7,10 @@ tags:
 - correlation
 - genserver
 - core
+status: implemented
 ---
 
 # SPEC-4: Command Dispatch and Result Correlation
-
-Status: Implemented
 
 ## Why
 

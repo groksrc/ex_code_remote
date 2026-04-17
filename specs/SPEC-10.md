@@ -8,11 +8,10 @@ tags:
 - async
 - audit
 - claude
+status: implemented
 ---
 
 # SPEC-10: Async Command Tools
-
-Status: New
 
 ## Why
 
