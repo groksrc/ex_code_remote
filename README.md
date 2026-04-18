@@ -184,16 +184,6 @@ fly deploy
 | `MCP_CLIENT_ID` | No | -- | OAuth client ID for MCP auth; MCP is open if unset |
 | `MCP_CLIENT_SECRET` | No | -- | OAuth client secret for MCP auth |
 
-### Connecting an agent
-
-Point the Python agent's `RELAY_URL` at the server's Tailscale IP:
-
-```
-RELAY_URL=ws://100.x.x.x:8080/ws/agent
-```
-
-Use `ws://` (not `wss://`) -- Tailscale provides WireGuard encryption at the transport layer.
-
 ### Connecting Claude.ai
 
 Add a custom MCP connector in Claude.ai settings:
@@ -202,9 +192,69 @@ Add a custom MCP connector in Claude.ai settings:
 - **OAuth Client ID**: value of `MCP_CLIENT_ID`
 - **OAuth Client Secret**: value of `MCP_CLIENT_SECRET`
 
+## Agent setup
+
+The Python agent runs on each machine you want to control remotely. It connects to the server via WebSocket and executes commands.
+
+### Quick start
+
+```sh
+cd agent
+./setup.sh
+```
+
+The setup script installs dependencies (via `uv`), prompts for your server URL, auth token, and machine name, and writes a `.env` file.
+
+### Running manually
+
+```sh
+cd agent
+./run.sh
+```
+
+### Running as a macOS service (launchd)
+
+For persistent background operation that survives reboots:
+
+1. Edit `agent/com.code.remote-agent.plist` -- replace `YOUR_USERNAME` and the path to match your system
+2. Copy to LaunchAgents and load:
+
+```sh
+cp agent/com.code.remote-agent.plist ~/Library/LaunchAgents/
+launchctl load ~/Library/LaunchAgents/com.code.remote-agent.plist
+```
+
+To stop: `launchctl unload ~/Library/LaunchAgents/com.code.remote-agent.plist`
+
+### Running in Docker (sandboxed)
+
+```sh
+cd agent
+docker build -t code-remote-agent .
+docker run -d \
+  -e RELAY_URL=ws://100.x.x.x:8080/ws/agent \
+  -e AUTH_TOKEN=your-token \
+  -e MACHINE_NAME=my-docker-agent \
+  code-remote-agent
+```
+
+### Agent environment variables
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `RELAY_URL` | Yes | WebSocket URL to the server (`ws://` for Tailscale, `wss://` for public) |
+| `AUTH_TOKEN` | Yes | Must match the server's `AUTH_TOKEN` |
+| `MACHINE_NAME` | Yes | Unique name for this machine (shown in `check_agent_status`) |
+
 ## Project structure
 
 ```
+agent/                 # Python agent (runs on remote machines)
+  agent.py             # WebSocket client, command execution
+  setup.sh             # Interactive installer
+  run.sh               # Launcher with log rotation
+  Dockerfile           # Sandboxed Linux container option
+  com.code.remote-agent.plist  # macOS launchd service template
 lib/
   ex_code_remote/
     agent/             # WebSocket handler, connection GenServer, registry
