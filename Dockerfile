@@ -28,8 +28,11 @@ COPY priv priv
 RUN mix compile
 RUN mix release
 
-# Tailscale binaries — pinned to 1.82.5
-FROM tailscale/tailscale:v1.82.5 AS tailscale
+# Tailscale binaries — pinned to 1.96.5 (latest stable Docker Hub image;
+# tailscale/tailscale container tags lag the static-binary releases, so
+# there is no v1.98.x image — v1.96.5 is current stable and clears the
+# security advisory that flagged the old v1.82.5).
+FROM tailscale/tailscale:v1.96.5 AS tailscale
 
 # Runtime stage
 FROM alpine:${ALPINE_VERSION} AS runtime
